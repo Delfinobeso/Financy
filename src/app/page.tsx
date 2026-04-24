@@ -5,16 +5,17 @@ import { useEffect } from "react";
 import { useBudget } from "@/lib/context";
 
 export default function Home() {
-  const { budget } = useBudget();
+  const { budget, isLoaded } = useBudget();
   const router = useRouter();
 
   useEffect(() => {
+    if (!isLoaded) return;
     if (budget) {
       router.replace("/dashboard");
     } else {
       router.replace("/onboarding");
     }
-  }, [budget, router]);
+  }, [budget, isLoaded, router]);
 
   return (
     <div className="flex flex-1 items-center justify-center">

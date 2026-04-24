@@ -19,12 +19,19 @@ export interface Budget {
   monthlyIncome: number;
   categories: Category[];
   expenses: Expense[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export const DEFAULT_CATEGORIES: Omit<Category, "id">[] = [
   { name: "Necessità", percentage: 50, color: "#5e6ad2" },
   { name: "Svago", percentage: 30, color: "#e4a951" },
   { name: "Risparmio", percentage: 20, color: "#4cb782" },
+];
+
+export const CATEGORY_COLORS = [
+  "#5e6ad2", "#e4a951", "#4cb782", "#e5484d", "#7c5cfc",
+  "#3ec8a0", "#ff6b6b", "#4ecdc4", "#ffd93d", "#6c5ce7",
 ];
 
 export function generateId(): string {
@@ -66,4 +73,14 @@ export function formatDate(dateStr: string): string {
     month: "short",
     year: "numeric",
   });
+}
+
+export function downloadJSON(data: unknown, filename: string) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
