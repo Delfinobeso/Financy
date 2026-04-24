@@ -2,7 +2,8 @@
 
 import { useState, useMemo } from "react";
 import { useBudget } from "@/lib/context";
-import { formatCurrency, formatDate, type Expense } from "@/lib/types";
+import { formatCurrency, formatDate } from "@/lib/types";
+import { useUndoDelete } from "@/hooks/useUndoDelete";
 
 export default function History() {
   const { budget, deleteExpense } = useBudget();
@@ -10,6 +11,8 @@ export default function History() {
   const [sort, setSort] = useState<"date-desc" | "date-asc" | "amount-desc" | "amount-asc">(
     "date-desc"
   );
+
+  const { pendingIds, requestDelete, undoDelete } = useUndoDelete(deleteExpense);
 
   const filtered = useMemo(() => {
     if (!budget) return [];
@@ -53,12 +56,12 @@ export default function History() {
 
   return (
     <div className="flex flex-col flex-1 max-w-lg mx-auto w-full px-6 py-8">
-      {/* Header */}
       <header className="mb-8">
         <div className="flex items-center gap-3 mb-6">
           <a
             href="/dashboard"
-            className="w-8 h-8 flex items-center justify-center rounded-lg border border-border hover:bg-surface transition-colors"
+            className="w-8 h-8 flex items-center justify-center rounded-lg border border-border hover:bg-surface transition-colors focus-visible:ring-2 focus-visible:ring-accent outline-none"
+            aria-label="Torna alla dashboard"
           >
             <svg
               width="14"
@@ -67,6 +70,7 @@ export default function History() {
               fill="none"
               stroke="currentColor"
               strokeWidth="1.5"
+              aria-hidden="true"
             >
               <path d="M9 3L5 7l4 4" />
             </svg>
@@ -79,16 +83,19 @@ export default function History() {
           </div>
         </div>
 
-        {/* Search + Sort */}
         <div className="flex gap-2">
+          <label htmlFor="history-filter" className="sr-only">Filtra spese</label>
           <input
+            id="history-filter"
             type="text"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="Filtra per categoria o descrizione..."
+            placeholder="Filtra..."
             className="flex-1 h-10 bg-surface border border-border rounded-lg px-3 text-sm outline-none focus:border-accent transition-colors placeholder:text-muted/50"
           />
+          <label htmlFor="history-sort" className="sr-only">Ordina spese</label>
           <select
+            id="history-sort"
             value={sort}
             onChange={(e) => setSort(e.target.value as typeof sort)}
             className="h-10 bg-surface border border-border rounded-lg px-3 text-sm outline-none focus:border-accent transition-colors appearance-none cursor-pointer font-mono"
@@ -107,34 +114,50 @@ export default function History() {
         )}
       </header>
 
-      {/* Expense list */}
       {filtered.length === 0 ? (
-        <p className="text-muted text-sm text-center py-16">
-          {filter ? "Nessun risultato." : "Nessuna spesa registrata."}
-        </p>
+        <div className="py-16 text-center">
+          {filter ? (
+            <>
+              <p className="text-2xl mb-2" aria-hidden="true">🔍</p>
+              <p className="text-muted text-sm">Nessun risultato per questo filtro</p>
+            </>
+          ) : (
+            <>
+              <p className="text-4xl mb-3" aria-hidden="true">📋</p>
+              <p className="text-muted text-sm">Ancora nessuna spesa</p>
+              <p className="text-muted/50 text-xs mt-1">
+                Quando aggiungi una spesa, apparirà qui
+              </p>
+            </>
+          )}
+        </div>
       ) : (
         <div className="space-y-1">
           {filtered.map((expense) => {
             const cat = budget.categories.find((c) => c.id === expense.categoryId);
+            const isPending = pendingIds.has(expense.id);
             return (
               <div
                 key={expense.id}
-                className="flex items-center justify-between py-3 px-3 rounded-lg hover:bg-surface transition-colors group"
+                className={`flex items-center justify-between py-3 px-3 rounded-lg transition-colors group ${
+                  isPending ? "bg-danger/5" : "hover:bg-surface"
+                }`}
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div
                     className="w-2 h-2 rounded-full shrink-0"
                     style={{ backgroundColor: cat?.color ?? "#888" }}
+                    aria-hidden="true"
                   />
                   <div className="min-w-0">
-                    <p className="text-sm truncate">
+                    <p className={`text-sm truncate ${isPending ? "line-through opacity-50" : ""}`}>
                       {expense.description || cat?.name}
                     </p>
                     <p className="text-xs text-muted mt-0.5">
                       <span className="font-mono">{formatDate(expense.date)}</span>
                       {cat && (
                         <>
-                          <span className="mx-1.5 text-border">·</span>
+                          <span className="mx-1.5 text-border" aria-hidden="true">·</span>
                           {cat.name}
                         </>
                       )}
@@ -142,15 +165,25 @@ export default function History() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
-                  <span className="text-sm font-mono tabular-nums">
+                  <span className={`text-sm font-mono tabular-nums ${isPending ? "opacity-50" : ""}`}>
                     {formatCurrency(expense.amount)}
                   </span>
-                  <button
-                    onClick={() => deleteExpense(expense.id)}
-                    className="text-muted hover:text-danger opacity-0 group-hover:opacity-100 transition-all text-xs"
-                  >
-                    Elimina
-                  </button>
+                  {isPending ? (
+                    <button
+                      onClick={() => undoDelete(expense.id)}
+                      className="text-accent text-xs font-medium hover:underline"
+                    >
+                      Annulla
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => requestDelete(expense.id)}
+                      className="text-muted hover:text-danger opacity-0 group-hover:opacity-100 transition-all text-xs"
+                      aria-label={`Elimina spesa: ${expense.description || cat?.name}`}
+                    >
+                      Elimina
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -158,30 +191,32 @@ export default function History() {
         </div>
       )}
 
-      {/* Bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-background border-t border-border">
+      <nav className="fixed bottom-0 left-0 right-0 bg-background border-t border-border" aria-label="Navigazione principale">
         <div className="max-w-lg mx-auto flex">
           <a
             href="/dashboard"
-            className="flex-1 flex flex-col items-center gap-1 py-3 text-muted hover:text-muted-hover transition-colors"
+            className="flex-1 flex flex-col items-center gap-1 py-3 text-muted hover:text-muted-hover transition-colors focus-visible:text-accent outline-none"
+            aria-label="Dashboard"
           >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
               <rect x="2" y="2" width="6" height="6" rx="1" />
               <rect x="10" y="2" width="6" height="6" rx="1" />
               <rect x="2" y="10" width="6" height="6" rx="1" />
               <rect x="10" y="10" width="6" height="6" rx="1" />
             </svg>
-            <span className="text-[10px] font-mono uppercase">Dashboard</span>
+            <span className="text-[10px]">Dashboard</span>
           </a>
           <a
             href="/history"
-            className="flex-1 flex flex-col items-center gap-1 py-3 text-foreground transition-colors"
+            className="flex-1 flex flex-col items-center gap-1 py-3 text-foreground transition-colors focus-visible:text-accent outline-none"
+            aria-current="page"
+            aria-label="Storico spese"
           >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
               <circle cx="9" cy="9" r="7" />
               <path d="M9 5v4l2.5 2.5" />
             </svg>
-            <span className="text-[10px] font-mono uppercase">Storico</span>
+            <span className="text-[10px]">Storico</span>
           </a>
         </div>
       </nav>

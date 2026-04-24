@@ -1,19 +1,19 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0a0a0a;
-  --foreground: #ededed;
-  --surface: #141414;
-  --border: #1f1f1f;
-  --border-hover: #2e2e2e;
-  --muted: #888888;
-  --muted-hover: #a0a0a0;
-  --accent: #5e6ad2;
-  --accent-hover: #6f7ae0;
-  --accent-muted: rgba(94, 106, 210, 0.12);
-  --danger: #e5484d;
-  --success: #4cb782;
-  --warning: #e4a951;
+  --background: oklch(0.15 0.006 260);
+  --foreground: oklch(0.92 0.004 260);
+  --surface: oklch(0.20 0.006 260);
+  --border: oklch(0.24 0.006 260);
+  --border-hover: oklch(0.30 0.006 260);
+  --muted: oklch(0.58 0.010 260);
+  --muted-hover: oklch(0.66 0.010 260);
+  --accent: oklch(0.62 0.18 280);
+  --accent-hover: oklch(0.68 0.16 280);
+  --accent-muted: oklch(0.62 0.08 280 / 0.12);
+  --danger: oklch(0.58 0.22 20);
+  --success: oklch(0.68 0.17 160);
+  --warning: oklch(0.75 0.15 85);
 }
 
 @theme inline {
@@ -30,8 +30,8 @@
   --color-danger: var(--danger);
   --color-success: var(--success);
   --color-warning: var(--warning);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
 }
 
 body {
@@ -55,4 +55,14 @@ input[type="number"] {
 input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(0.7);
   cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

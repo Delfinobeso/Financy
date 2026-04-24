@@ -4,12 +4,11 @@ import {
   createContext,
   useContext,
   useReducer,
-  useEffect,
   useCallback,
   type ReactNode,
 } from "react";
 import type { Budget, Expense, Category } from "@/lib/types";
-import { DEFAULT_CATEGORIES, generateId } from "@/lib/types";
+import { generateId } from "@/lib/types";
 
 const STORAGE_KEY = "financy-budget";
 
@@ -80,13 +79,6 @@ const BudgetContext = createContext<BudgetContextType | null>(null);
 
 export function BudgetProvider({ children }: { children: ReactNode }) {
   const [budget, dispatch] = useReducer(budgetReducer, null, loadBudget);
-
-  useEffect(() => {
-    const stored = loadBudget();
-    if (stored) {
-      dispatch({ type: "SETUP", income: stored.monthlyIncome, categories: stored.categories });
-    }
-  }, []);
 
   const setup = useCallback((income: number, categories: Category[]) => {
     dispatch({ type: "SETUP", income, categories });

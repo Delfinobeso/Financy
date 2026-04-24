@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useBudget } from "@/lib/context";
-import { DEFAULT_CATEGORIES, formatCurrency, type Category } from "@/lib/types";
+import { DEFAULT_CATEGORIES, formatCurrency } from "@/lib/types";
 
 export default function Onboarding() {
   const { setup } = useBudget();
@@ -11,7 +11,7 @@ export default function Onboarding() {
   const [step, setStep] = useState(0);
   const [income, setIncome] = useState("");
   const [categories, setCategories] = useState(
-    DEFAULT_CATEGORIES.map((c, i) => ({ ...c, id: c.name.toLowerCase().replace(/\s+/g, "-") }))
+    DEFAULT_CATEGORIES.map((c) => ({ ...c, id: c.name.toLowerCase().replace(/\s+/g, "-") }))
   );
 
   const totalPercentage = useMemo(
@@ -24,10 +24,39 @@ export default function Onboarding() {
     setIncome(cleaned);
   };
 
-  const handlePercentageChange = (index: number, value: number) => {
-    setCategories((prev) =>
-      prev.map((c, i) => (i === index ? { ...c, percentage: value } : c))
-    );
+  const handlePercentageChange = (index: number, newValue: number) => {
+    setCategories((prev) => {
+      const oldValue = prev[index].percentage;
+      const delta = newValue - oldValue;
+      const others = prev
+        .map((c, i) => ({ i, pct: c.percentage }))
+        .filter((x) => x.i !== index);
+
+      const totalOtherPct = others.reduce((s, x) => s + x.pct, 0);
+
+      const next = prev.map((c, i) => {
+        if (i === index) return { ...c, percentage: newValue };
+        if (totalOtherPct > 0) {
+          const share = c.percentage / totalOtherPct;
+          return { ...c, percentage: Math.max(0, c.percentage - Math.round(delta * share)) };
+        }
+        return c;
+      });
+
+      const sum = next.reduce((s, c) => s + c.percentage, 0);
+      if (sum !== 100 && next.length > 1) {
+        let diff = 100 - sum;
+        const targetIndex = next.findIndex((_, i) => i !== index);
+        if (targetIndex >= 0) {
+          next[targetIndex] = {
+            ...next[targetIndex],
+            percentage: Math.max(0, next[targetIndex].percentage + diff),
+          };
+        }
+      }
+
+      return next;
+    });
   };
 
   const handleFinish = () => {
@@ -42,8 +71,14 @@ export default function Onboarding() {
 
   return (
     <div className="flex flex-col flex-1 max-w-lg mx-auto w-full px-6 py-12">
-      {/* Progress dots */}
-      <div className="flex gap-2 mb-12">
+      <div
+        className="flex gap-2 mb-12"
+        role="progressbar"
+        aria-valuenow={step + 1}
+        aria-valuemin={1}
+        aria-valuemax={2}
+        aria-label={`Step ${step + 1} di 2`}
+      >
         <div className="h-1 flex-1 rounded-full bg-accent" />
         <div className={`h-1 flex-1 rounded-full transition-colors ${step >= 1 ? "bg-accent" : "bg-border"}`} />
       </div>
@@ -51,25 +86,26 @@ export default function Onboarding() {
       {step === 0 && (
         <div className="flex flex-col flex-1">
           <div className="mb-8">
-            <p className="text-muted text-sm font-mono mb-2">Step 1 di 2</p>
+            <p className="text-muted text-sm mb-2">Step 1 di 2</p>
             <h1 className="text-2xl font-semibold tracking-tight mb-2">
               Quanto guadagni al mese?
             </h1>
             <p className="text-muted text-sm leading-relaxed">
-              Inserisci il tuo reddito mensile netto. Lo useremo per calcolare i limiti del tuo budget.
+              Inserisci il tuo reddito netto — useremo questa cifra per calcolare i limiti di ogni categoria.
             </p>
           </div>
 
           <div className="flex-1 flex items-center justify-center">
             <div className="w-full">
-              <label className="block text-muted text-xs font-mono uppercase tracking-wider mb-3">
+              <label htmlFor="income-input" className="block text-muted text-xs tracking-wider mb-3">
                 Reddito mensile
               </label>
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-4xl text-muted font-light">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-4xl text-muted font-light" aria-hidden="true">
                   €
                 </span>
                 <input
+                  id="income-input"
                   type="text"
                   inputMode="numeric"
                   value={income}
@@ -90,7 +126,7 @@ export default function Onboarding() {
           <button
             onClick={() => incomeNum > 0 && setStep(1)}
             disabled={!incomeNum}
-            className="w-full h-12 bg-foreground text-background font-medium rounded-lg disabled:opacity-20 disabled:cursor-not-allowed hover:bg-muted-hover transition-colors"
+            className="w-full h-12 bg-foreground text-background font-medium rounded-lg disabled:opacity-20 disabled:cursor-not-allowed hover:bg-muted-hover transition-colors focus-visible:ring-2 focus-visible:ring-accent outline-none"
           >
             Continua
           </button>
@@ -100,12 +136,12 @@ export default function Onboarding() {
       {step === 1 && (
         <div className="flex flex-col flex-1">
           <div className="mb-8">
-            <p className="text-muted text-sm font-mono mb-2">Step 2 di 2</p>
+            <p className="text-muted text-sm mb-2">Step 2 di 2</p>
             <h1 className="text-2xl font-semibold tracking-tight mb-2">
-              Ripartisci il budget
+              Come vuoi suddividerlo?
             </h1>
             <p className="text-muted text-sm leading-relaxed">
-              Distribuisci il tuo reddito tra le categorie. Il totale deve essere 100%.
+              Sposta uno slider e gli altri si adattano da soli per restare a 100%.
             </p>
           </div>
 
@@ -119,6 +155,7 @@ export default function Onboarding() {
                       <div
                         className="w-3 h-3 rounded-full"
                         style={{ backgroundColor: category.color }}
+                        aria-hidden="true"
                       />
                       <span className="text-sm font-medium">{category.name}</span>
                     </div>
@@ -128,13 +165,17 @@ export default function Onboarding() {
                       {formatCurrency(amount)}
                     </span>
                   </div>
+                  <label htmlFor={`slider-${category.id}`} className="sr-only">
+                    {category.name}: {category.percentage}%
+                  </label>
                   <input
+                    id={`slider-${category.id}`}
                     type="range"
                     min={0}
                     max={100}
                     value={category.percentage}
                     onChange={(e) => handlePercentageChange(idx, parseInt(e.target.value))}
-                    className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+                    className="w-full h-1.5 rounded-full appearance-none cursor-pointer focus-visible:ring-2 focus-visible:ring-accent outline-none"
                     style={{
                       background: `linear-gradient(to right, ${category.color} 0%, ${category.color} ${category.percentage}%, #1f1f1f ${category.percentage}%, #1f1f1f 100%)`,
                       accentColor: category.color,
@@ -150,6 +191,9 @@ export default function Onboarding() {
                   ? "border-success/30 bg-success/5 text-success"
                   : "border-danger/30 bg-danger/5 text-danger"
               }`}
+              role="status"
+              aria-live="polite"
+              aria-label={`Totale allocazione: ${totalPercentage}%. ${totalPercentage === 100 ? "Bilanciato" : "Deve essere 100%"}`}
             >
               <span className="text-sm font-mono">Totale</span>
               <span className="text-sm font-mono tabular-nums font-medium">
@@ -161,14 +205,14 @@ export default function Onboarding() {
           <div className="flex gap-3 mt-8">
             <button
               onClick={() => setStep(0)}
-              className="h-12 px-6 border border-border rounded-lg text-sm font-medium hover:bg-surface transition-colors"
+              className="h-12 px-6 border border-border rounded-lg text-sm font-medium hover:bg-surface transition-colors focus-visible:ring-2 focus-visible:ring-accent outline-none"
             >
               Indietro
             </button>
             <button
               onClick={handleFinish}
               disabled={totalPercentage !== 100}
-              className="flex-1 h-12 bg-foreground text-background font-medium rounded-lg disabled:opacity-20 disabled:cursor-not-allowed hover:bg-muted-hover transition-colors"
+              className="flex-1 h-12 bg-foreground text-background font-medium rounded-lg disabled:opacity-20 disabled:cursor-not-allowed hover:bg-muted-hover transition-colors focus-visible:ring-2 focus-visible:ring-accent outline-none"
             >
               Inizia a usare Financy
             </button>
