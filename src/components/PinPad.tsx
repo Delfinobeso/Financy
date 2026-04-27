@@ -23,9 +23,8 @@ export function PinPad({ value, onChange, maxLength = 4, label, error }: Props) 
     <div className="flex flex-col items-center gap-5 w-full">
       {/* Dot indicators */}
       <div
-        className="flex gap-3.5"
+        className={`flex gap-3.5 ${error ? "motion-safe:animate-[shake_0.4s_cubic-bezier(.36,.07,.19,.97)_both]" : ""}`}
         aria-label={`${value.length} di ${maxLength} cifre inserite`}
-        style={error ? { animation: "shake 0.4s cubic-bezier(.36,.07,.19,.97) both" } : undefined}
       >
         {Array.from({ length: maxLength }).map((_, i) => (
           <div

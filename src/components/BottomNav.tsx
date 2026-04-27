@@ -14,7 +14,7 @@ export function BottomNav({ active, budgetAlert = false }: { active: Tab; budget
       <div className="max-w-lg mx-auto flex">
         <NavTab href="/dashboard" icon="grid"     label="Budget"       active={active === "dashboard"} alert={budgetAlert} />
         <NavTab href="/history"   icon="clock"    label="Storico"      active={active === "history"}   />
-        <NavTab href="/piggy"     icon="piggy"    label="Risparmi"     active={active === "piggy"}     />
+        <NavTab href="/piggy"     icon="piggy"    label="Salvadanaio"  active={active === "piggy"}     />
         <NavTab href="/settings"  icon="gear"     label="Impostazioni" active={active === "settings"}  />
       </div>
     </nav>

@@ -9,7 +9,6 @@ import {
   getCategoryBudget,
   getRemaining,
   formatCurrency,
-  formatDate,
   formatMonthLabel,
   getMonthKey,
   type Expense,
@@ -21,7 +20,7 @@ import { UndoToast } from "@/components/UndoToast";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 
 export default function Dashboard() {
-  const { budget, isLoaded, addExpense, editExpense, deleteExpense, closeMonth, reset } = useBudget();
+  const { budget, isLoaded, addExpense, editExpense, deleteExpense, closeMonth } = useBudget();
   const router = useRouter();
 
   const now = new Date();
@@ -31,7 +30,7 @@ export default function Dashboard() {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [highlightedCategory, setHighlightedCategory] = useState<string | null>(null);
-  const [newExpenseId, setNewExpenseId] = useState<string | null>(null);
+  const [showAllCategories, setShowAllCategories] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   const { pendingIds, requestDelete, undoDelete, lastDeleted, dismissToast } = useUndoDelete(deleteExpense);
@@ -39,24 +38,27 @@ export default function Dashboard() {
   useEffect(() => { const t = setTimeout(() => setMounted(true), 60); return () => clearTimeout(t); }, []);
 
   const isCurrentMonth = viewYear === now.getFullYear() && viewMonth === now.getMonth();
-
-  const goToToday = () => {
-    setViewYear(now.getFullYear());
-    setViewMonth(now.getMonth());
-  };
   const isPastMonth =
     viewYear < now.getFullYear() ||
     (viewYear === now.getFullYear() && viewMonth < now.getMonth());
 
   const goToPrevMonth = () => {
+    setShowAllCategories(false);
     if (viewMonth === 0) { setViewMonth(11); setViewYear((y) => y - 1); }
     else setViewMonth((m) => m - 1);
   };
 
   const goToNextMonth = () => {
     if (isCurrentMonth) return;
+    setShowAllCategories(false);
     if (viewMonth === 11) { setViewMonth(0); setViewYear((y) => y + 1); }
     else setViewMonth((m) => m + 1);
+  };
+
+  const goToToday = () => {
+    setViewYear(now.getFullYear());
+    setViewMonth(now.getMonth());
+    setShowAllCategories(false);
   };
 
   const monthExpenses = useMemo(() => {
@@ -74,14 +76,11 @@ export default function Dashboard() {
 
   const handleAdd = useCallback(
     (expense: { categoryId: string; amount: number; description: string; date: string; recurring?: boolean }) => {
-      const ts = Date.now().toString(36);
       addExpense(expense);
       setShowAddSheet(false);
       setHighlightedCategory(expense.categoryId);
-      setNewExpenseId(ts);
       try { navigator.vibrate(10); } catch {}
       setTimeout(() => setHighlightedCategory(null), 1400);
-      setTimeout(() => setNewExpenseId(null), 1600);
     },
     [addExpense]
   );
@@ -107,7 +106,6 @@ export default function Dashboard() {
     if (d === yesterday) return "Ieri";
     return new Date(d).toLocaleDateString("it-IT", { day: "numeric", month: "long" });
   };
-  // Group expenses by date
   const groupedExpenses = recentExpenses.reduce<{ date: string; items: typeof recentExpenses }[]>((acc, e) => {
     const last = acc[acc.length - 1];
     if (last && last.date === e.date) { last.items.push(e); }
@@ -124,11 +122,22 @@ export default function Dashboard() {
   const isMonthClosed = !!(budget.closedMonths?.[monthKey]);
   const showCloseBanner = isCurrentMonth && !isMonthClosed && monthExpenses.length > 0;
 
-  const recurringExpenses = useMemo(
-    () => monthExpenses.filter((e) => e.recurring),
-    [monthExpenses]
+  // distill: only show categories with spending (or highlighted). Reveal all on demand.
+  const activeCategories = budget.categories.filter(
+    (c) => (spentByCategory.get(c.id) || 0) > 0 || c.id === highlightedCategory
   );
+  const inactiveCount = budget.categories.length - activeCategories.length;
+  const visibleCategories = showAllCategories ? budget.categories : activeCategories;
+
+  const recurringExpenses = monthExpenses.filter((e) => e.recurring);
+
+  // polish: pre-select all recurring when modal opens
   const [selectedRecurring, setSelectedRecurring] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (showCloseModal) {
+      setSelectedRecurring(new Set(recurringExpenses.map((e) => e.id)));
+    }
+  }, [showCloseModal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleRecurring = (id: string) =>
     setSelectedRecurring((prev) => {
@@ -139,9 +148,7 @@ export default function Dashboard() {
 
   const handleCloseMonth = () => {
     closeMonth(monthKey, totalRemaining, totalSpent, budget.monthlyIncome);
-    // Propagate selected recurring expenses to next month
-    const nextMonthDate = new Date(viewYear, viewMonth + 1, 1);
-    const nextMonthStr = nextMonthDate.toISOString().slice(0, 10);
+    const nextMonthStr = new Date(viewYear, viewMonth + 1, 1).toISOString().slice(0, 10);
     monthExpenses
       .filter((e) => e.recurring && selectedRecurring.has(e.id))
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -156,19 +163,16 @@ export default function Dashboard() {
     ? "var(--color-warning)"
     : "var(--color-accent)";
 
+  // onboard: first-ever use detection
+  const isFirstUse = budget.expenses.length === 0 && Object.keys(budget.closedMonths ?? {}).length === 0;
+
   return (
     <div className="flex flex-col flex-1 max-w-lg mx-auto w-full" style={{ paddingBottom: "calc(6rem + env(safe-area-inset-bottom))" }}>
 
-      {/* Month navigation bar */}
+      {/* Month navigation */}
       <div className="flex items-center justify-between px-6 pt-8 pb-4">
-        <button
-          onClick={goToPrevMonth}
-          className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-surface transition-colors"
-          aria-label="Mese precedente"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
-            <path d="M10 3L6 8l4 5" />
-          </svg>
+        <button onClick={goToPrevMonth} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-surface transition-colors" aria-label="Mese precedente">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true"><path d="M10 3L6 8l4 5" /></svg>
         </button>
 
         <div className="text-center">
@@ -179,23 +183,12 @@ export default function Dashboard() {
           >
             {formatMonthLabel(viewYear, viewMonth)}
           </button>
-          {isPastMonth && !isMonthClosed && (
-            <p className="text-xs text-muted mt-0.5">sola lettura · tap per tornare</p>
-          )}
-          {isMonthClosed && (
-            <p className="text-xs text-success mt-0.5">chiuso</p>
-          )}
+          {isPastMonth && !isMonthClosed && <p className="text-xs text-muted mt-0.5">tap per tornare</p>}
+          {isMonthClosed && <p className="text-xs text-success mt-0.5">chiuso</p>}
         </div>
 
-        <button
-          onClick={goToNextMonth}
-          disabled={isCurrentMonth}
-          className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-surface transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
-          aria-label="Mese successivo"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
-            <path d="M6 3l4 5-4 5" />
-          </svg>
+        <button onClick={goToNextMonth} disabled={isCurrentMonth} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-surface transition-colors disabled:opacity-25 disabled:cursor-not-allowed" aria-label="Mese successivo">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true"><path d="M6 3l4 5-4 5" /></svg>
         </button>
       </div>
 
@@ -216,24 +209,15 @@ export default function Dashboard() {
               </p>
             </div>
           </div>
-
-          {/* Budget bar */}
           <div className="h-2 rounded-full bg-border overflow-hidden" role="progressbar" aria-valuenow={Math.round(spentPercent)} aria-valuemin={0} aria-valuemax={100} aria-label={`Budget utilizzato: ${Math.round(spentPercent)}%`}>
-            <div
-              className="h-full rounded-full transition-[width] duration-500"
-              style={{ width: `${spentPercent}%`, backgroundColor: barColor }}
-            />
+            <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${spentPercent}%`, backgroundColor: barColor }} />
           </div>
           <p className="text-xs text-muted mt-2 tabular-nums font-mono">
             {Math.round(spentPercent)}% di {formatCurrency(budget.monthlyIncome)}
             {isCurrentMonth && totalRemaining > 0 && (() => {
               const daysLeft = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate() + 1;
               const perDay = totalRemaining / Math.max(daysLeft, 1);
-              return (
-                <span className="ml-2 text-muted/60">
-                  · ~{formatCurrency(Math.floor(perDay))}/giorno
-                </span>
-              );
+              return <span className="ml-2 text-muted/60">· ~{formatCurrency(Math.floor(perDay))}/giorno</span>;
             })()}
           </p>
         </div>
@@ -251,144 +235,171 @@ export default function Dashboard() {
                   : `Superato il budget di ${formatCurrency(Math.abs(totalRemaining))}`}
               </p>
             </div>
-            <button
-              onClick={() => setShowCloseModal(true)}
-              className="shrink-0 h-7 px-3 text-xs font-semibold rounded-lg border border-warning/30 text-warning hover:bg-warning/10 transition-colors"
-            >
-              Chiudi
+            {/* clarify: "Chiudi" → "Chiudi mese" */}
+            <button onClick={() => setShowCloseModal(true)} className="shrink-0 h-7 px-3 text-xs font-semibold rounded-lg border border-warning/30 text-warning hover:bg-warning/10 transition-colors">
+              Chiudi mese
             </button>
           </div>
         </div>
       )}
 
-      {/* Categories */}
-      <section className="px-6 mb-6">
-        <p className="text-xs font-medium text-muted/70 uppercase tracking-widest mb-3">Categorie</p>
-        <div className="space-y-2">
-          {budget.categories.map((category, index) => {
-            const spent = spentByCategory.get(category.id) || 0;
-            const budgetAmount = getCategoryBudget(budget.monthlyIncome, category.percentage);
-            const remaining = getRemaining(budget.monthlyIncome, category.percentage, spent);
-            const pct = budgetAmount > 0 ? Math.min((spent / budgetAmount) * 100, 100) : 0;
-            const isHighlighted = highlightedCategory === category.id;
-            const isOver = spent > budgetAmount;
-
-            return (
-              <div
-                key={category.id}
-                className={`rounded-xl border px-4 py-3 transition-all duration-300 ${
-                  isHighlighted
-                    ? "border-accent/40 bg-accent-muted"
-                    : "border-border bg-surface"
-                }`}
-                role="region"
-                aria-label={`${category.name}: ${formatCurrency(remaining)} rimanenti`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-2 h-2 rounded-full shrink-0"
-                      style={{ backgroundColor: category.color }}
-                      aria-hidden="true"
-                    />
-                    <span className="text-sm font-medium">{category.name}</span>
-                  </div>
-                  <span className={`text-sm font-mono tabular-nums ${isOver ? "text-danger" : "text-muted"}`}>
-                    {isOver ? `−${formatCurrency(Math.abs(remaining))}` : formatCurrency(remaining)}
-                  </span>
-                </div>
-                <div className="h-1 rounded-full bg-border overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-[width] duration-700"
-                    style={{
-                      width: mounted ? `${pct}%` : "0%",
-                      transitionDelay: mounted ? `${index * 40}ms` : "0ms",
-                      backgroundColor: isOver ? "var(--color-danger)" : pct > 80 ? "var(--color-warning)" : category.color,
-                    }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Recent expenses */}
-      <section className="px-6">
-        <p className="text-xs font-medium text-muted/70 uppercase tracking-widest mb-3">
-          {isPastMonth ? "Spese del mese" : "Ultime spese"}
-        </p>
-        {recentExpenses.length === 0 ? (
-          <div className="py-12 text-center">
-            <p className="text-muted text-sm">Nessuna spesa questo mese</p>
-            {!isPastMonth && (
-              <p className="text-muted/50 text-xs mt-1">
-                Tocca &ldquo;Aggiungi spesa&rdquo; per iniziare
-              </p>
+      {/* Categories — distill: only active by default */}
+      {(visibleCategories.length > 0 || !isFirstUse) && (
+        <section className="px-6 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-medium text-muted/70 uppercase tracking-widest">Categorie</p>
+            {inactiveCount > 0 && !showAllCategories && (
+              <button onClick={() => setShowAllCategories(true)} className="text-xs text-muted hover:text-muted-hover transition-colors">
+                +{inactiveCount} senza spese
+              </button>
             )}
+            {showAllCategories && activeCategories.length < budget.categories.length && (
+              <button onClick={() => setShowAllCategories(false)} className="text-xs text-muted hover:text-muted-hover transition-colors">
+                Comprimi
+              </button>
+            )}
+          </div>
+
+          {visibleCategories.length === 0 ? (
+            <p className="text-xs text-muted py-2">Nessuna categoria con spese questo mese.</p>
+          ) : (
+            <div className="space-y-2">
+              {visibleCategories.map((category, index) => {
+                const spent = spentByCategory.get(category.id) || 0;
+                const budgetAmount = getCategoryBudget(budget.monthlyIncome, category.percentage);
+                const remaining = getRemaining(budget.monthlyIncome, category.percentage, spent);
+                const pct = budgetAmount > 0 ? Math.min((spent / budgetAmount) * 100, 100) : 0;
+                const isHighlighted = highlightedCategory === category.id;
+                const isOver = spent > budgetAmount;
+
+                return (
+                  <div
+                    key={category.id}
+                    className={`rounded-xl border px-4 py-3 transition-all duration-300 ${isHighlighted ? "border-accent/40 bg-accent-muted" : "border-border bg-surface"}`}
+                    role="region"
+                    aria-label={`${category.name}: ${formatCurrency(remaining)} rimanenti`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: category.color }} aria-hidden="true" />
+                        <span className="text-sm font-medium">{category.name}</span>
+                      </div>
+                      <span className={`text-sm font-mono tabular-nums ${isOver ? "text-danger" : "text-muted"}`}>
+                        {isOver ? `−${formatCurrency(Math.abs(remaining))}` : formatCurrency(remaining)}
+                      </span>
+                    </div>
+                    <div className="h-1 rounded-full bg-border overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-[width] duration-700"
+                        style={{
+                          width: mounted ? `${pct}%` : "0%",
+                          transitionDelay: mounted ? `${index * 40}ms` : "0ms",
+                          backgroundColor: isOver ? "var(--color-danger)" : pct > 80 ? "var(--color-warning)" : category.color,
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Expenses / empty state */}
+      <section className="px-6">
+        {isFirstUse && isCurrentMonth ? (
+          /* onboard: welcoming first-use state */
+          <div className="py-10 text-center">
+            <p className="text-base font-semibold tracking-tight mb-1">Tutto pronto.</p>
+            <p className="text-sm text-muted mb-6">
+              Aggiungi la prima spesa per iniziare a tracciare il tuo mese.
+            </p>
+            <div className="flex flex-wrap gap-2 justify-center">
+              {budget.categories.slice(0, 3).map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setShowAddSheet(true)}
+                  className="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-border text-xs text-muted hover:bg-surface hover:text-foreground transition-colors"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: cat.color }} aria-hidden="true" />
+                  {cat.name}
+                </button>
+              ))}
+            </div>
           </div>
         ) : (
-          <div>
-            {groupedExpenses.map(({ date, items }, gi) => (
-              <div key={date}>
-                <p className="text-xs text-muted/60 font-medium px-2 pt-3 pb-1.5">{dateLabel(date)}</p>
-                <div className="space-y-px">
-                  {items.map((expense, ei) => {
-                    const cat = budget.categories.find((c) => c.id === expense.categoryId);
-                    const isPending = pendingIds.has(expense.id);
-                    const isNewest = newExpenseId !== null && gi === 0 && ei === 0;
-                    return (
-                      <button
-                        key={expense.id}
-                        onClick={() => !isPending && !isPastMonth && setEditingExpense(expense)}
-                        className={`w-full flex items-center justify-between py-2.5 px-2 rounded-lg transition-all group text-left ${
-                          isNewest ? "bg-success/10 animate-fade-in" : isPending ? "bg-danger/5 cursor-default" : isPastMonth ? "cursor-default" : "hover:bg-surface"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cat?.color ?? "#888" }} aria-hidden="true" />
-                          <div className="min-w-0">
-                            <p className={`text-sm truncate ${isPending ? "line-through opacity-50" : ""}`}>
-                              {expense.description || cat?.name}
-                              {expense.recurring && <span className="text-recurring text-xs ml-1.5 font-mono" aria-label="Spesa ricorrente">↻</span>}
-                            </p>
-                            <p className="text-xs text-muted mt-0.5">{cat?.name}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3 shrink-0 ml-3">
-                          <span className={`text-sm font-mono tabular-nums ${isPending ? "opacity-50" : ""}`}>{formatCurrency(expense.amount)}</span>
-                          {!isPending && !isPastMonth && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); requestDelete(expense.id, expense.description || cat?.name || ""); try { navigator.vibrate(10); } catch {} }}
-                              className="text-muted hover:text-danger opacity-0 group-hover:opacity-100 transition-all text-xs"
-                              aria-label={`Elimina: ${expense.description || cat?.name}`}
-                            >×</button>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+          <>
+            <p className="text-xs font-medium text-muted/70 uppercase tracking-widest mb-3">
+              {isPastMonth ? "Spese del mese" : "Ultime spese"}
+            </p>
+            {recentExpenses.length === 0 ? (
+              <div className="py-10 text-center">
+                <p className="text-muted text-sm">Nessuna spesa questo mese</p>
               </div>
-            ))}
-            {monthExpenses.length > 8 && (
-              <Link href="/history" className="block text-center text-sm text-muted hover:text-muted-hover py-3 transition-colors">
-                Vedi tutte ({monthExpenses.length})
-              </Link>
+            ) : (
+              <div>
+                {groupedExpenses.map(({ date, items }) => (
+                  <div key={date}>
+                    <p className="text-xs text-muted/60 font-medium px-2 pt-3 pb-1.5">{dateLabel(date)}</p>
+                    <div className="space-y-px">
+                      {items.map((expense) => {
+                        const cat = budget.categories.find((c) => c.id === expense.categoryId);
+                        const isPending = pendingIds.has(expense.id);
+                        return (
+                          <button
+                            key={expense.id}
+                            onClick={() => !isPending && !isPastMonth && setEditingExpense(expense)}
+                            className={`w-full flex items-center justify-between py-2.5 px-2 rounded-lg transition-all group text-left ${isPending ? "bg-danger/5 cursor-default" : isPastMonth ? "cursor-default" : "hover:bg-surface"}`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cat?.color ?? "#888" }} aria-hidden="true" />
+                              <div className="min-w-0">
+                                <p className={`text-sm truncate ${isPending ? "line-through opacity-50" : ""}`}>
+                                  {expense.description || cat?.name}
+                                  {expense.recurring && <span className="text-recurring text-xs ml-1.5 font-mono" aria-label="Spesa ricorrente">↻</span>}
+                                </p>
+                                <p className="text-xs text-muted mt-0.5">{cat?.name}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0 ml-3">
+                              <span className={`text-sm font-mono tabular-nums ${isPending ? "opacity-50" : ""}`}>{formatCurrency(expense.amount)}</span>
+                              {!isPending && !isPastMonth && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); requestDelete(expense.id, expense.description || cat?.name || ""); try { navigator.vibrate(10); } catch {} }}
+                                  className="text-muted hover:text-danger opacity-0 group-hover:opacity-100 transition-all text-xs"
+                                  aria-label={`Elimina: ${expense.description || cat?.name}`}
+                                >×</button>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+                {monthExpenses.length > 8 && (
+                  <Link href="/history" className="block text-center text-sm text-muted hover:text-muted-hover py-3 transition-colors">
+                    Vedi tutte ({monthExpenses.length})
+                  </Link>
+                )}
+              </div>
             )}
-          </div>
+          </>
         )}
       </section>
 
-      {/* FAB */}
+      {/* FAB — layout: circular bottom-right */}
       {!isPastMonth && (
         <button
           onClick={() => setShowAddSheet(true)}
-          className="fixed right-1/2 translate-x-1/2 max-w-[calc(var(--spacing)*128)] w-[calc(100%-3rem)] h-11 bg-foreground text-background text-sm font-semibold rounded-xl hover:bg-muted-hover transition-colors shadow-lg focus-visible:ring-2 focus-visible:ring-accent outline-none z-30"
-          style={{ bottom: "calc(4rem + env(safe-area-inset-bottom) + 12px)" }}
+          className="fixed w-14 h-14 rounded-full bg-foreground text-background flex items-center justify-center shadow-lg hover:bg-muted-hover transition-colors focus-visible:ring-2 focus-visible:ring-accent outline-none z-30 active:scale-95"
+          style={{ bottom: "calc(5rem + env(safe-area-inset-bottom))", right: "1.25rem" }}
           aria-label="Aggiungi una nuova spesa"
         >
-          + Aggiungi spesa
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <path d="M11 4v14M4 11h14" />
+          </svg>
         </button>
       )}
 
@@ -434,7 +445,7 @@ export default function Dashboard() {
               <h3 id="close-month-title" className="text-base font-semibold tracking-tight mb-5">
                 Chiudi {formatMonthLabel(viewYear, viewMonth)}
               </h3>
-              <div className="space-y-3 mb-6">
+              <div className="space-y-3 mb-5">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted">Budget mensile</span>
                   <span className="font-mono tabular-nums">{formatCurrency(budget.monthlyIncome)}</span>
@@ -457,7 +468,7 @@ export default function Dashboard() {
                 </p>
               )}
 
-              {/* Recurring expenses to propagate */}
+              {/* Recurring — clarify: pre-selected, with clear label */}
               {recurringExpenses.length > 0 && (
                 <div className="mb-5">
                   <p className="text-xs font-medium text-muted/70 uppercase tracking-widest mb-2">
@@ -468,12 +479,7 @@ export default function Dashboard() {
                       const cat = budget.categories.find((c) => c.id === e.categoryId);
                       return (
                         <label key={e.id} className="flex items-center gap-3 py-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedRecurring.has(e.id)}
-                            onChange={() => toggleRecurring(e.id)}
-                            className="w-4 h-4 accent-accent"
-                          />
+                          <input type="checkbox" checked={selectedRecurring.has(e.id)} onChange={() => toggleRecurring(e.id)} className="w-4 h-4 accent-accent" />
                           <span className="flex-1 text-sm truncate">{e.description || cat?.name}</span>
                           <span className="text-sm font-mono tabular-nums text-muted">{formatCurrency(e.amount)}</span>
                         </label>
@@ -484,29 +490,16 @@ export default function Dashboard() {
               )}
 
               <div className="flex gap-3">
-                <button
-                  onClick={() => setShowCloseModal(false)}
-                  className="flex-1 h-11 border border-border rounded-xl text-sm font-medium hover:bg-surface2 transition-colors"
-                >
-                  Annulla
-                </button>
-                <button
-                  onClick={handleCloseMonth}
-                  className="flex-1 h-11 bg-foreground text-background text-sm font-semibold rounded-xl hover:bg-muted-hover transition-colors"
-                >
-                  Chiudi mese
-                </button>
+                <button onClick={() => setShowCloseModal(false)} className="flex-1 h-11 border border-border rounded-xl text-sm font-medium hover:bg-surface2 transition-colors">Annulla</button>
+                <button onClick={handleCloseMonth} className="flex-1 h-11 bg-foreground text-background text-sm font-semibold rounded-xl hover:bg-muted-hover transition-colors">Chiudi mese</button>
               </div>
             </div>
           </div>
         </div>
       )}
+
       {lastDeleted && (
-        <UndoToast
-          label={lastDeleted.label}
-          onUndo={() => undoDelete(lastDeleted.id)}
-          onDismiss={dismissToast}
-        />
+        <UndoToast label={lastDeleted.label} onUndo={() => undoDelete(lastDeleted.id)} onDismiss={dismissToast} />
       )}
     </div>
   );

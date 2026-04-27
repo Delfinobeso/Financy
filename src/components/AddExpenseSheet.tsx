@@ -214,18 +214,25 @@ export function AddExpenseSheet({ categories, monthlyIncome, spentByCategory, on
                     />
                   </div>
 
-                  <label className="flex items-center justify-between py-1 cursor-pointer select-none">
-                    <span className="flex items-center gap-2 text-sm">
-                      <span className="text-recurring font-mono" aria-hidden="true">↻</span>
-                      Spesa ricorrente
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={recurring}
-                      onChange={(e) => setRecurring(e.target.checked)}
-                      className="w-4 h-4 accent-accent cursor-pointer"
-                    />
-                  </label>
+                  <div>
+                    <label className="flex items-center justify-between py-1 cursor-pointer select-none">
+                      <span className="flex items-center gap-2 text-sm">
+                        <span className="text-recurring font-mono" aria-hidden="true">↻</span>
+                        Spesa ricorrente
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={recurring}
+                        onChange={(e) => setRecurring(e.target.checked)}
+                        className="w-4 h-4 accent-accent cursor-pointer"
+                      />
+                    </label>
+                    {recurring && (
+                      <p className="text-xs text-muted pl-6 pb-1">
+                        Verrà proposta di nuovo alla chiusura del mese.
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 <button

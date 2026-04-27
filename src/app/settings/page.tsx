@@ -241,7 +241,7 @@ export default function Settings() {
         <h1 className="text-xl font-semibold tracking-tight">Impostazioni</h1>
       </header>
 
-      <section className="mb-10">
+      <section className="mb-8">
         <h2 className="text-xs font-medium text-muted/70 uppercase tracking-widest mb-3">Reddito mensile</h2>
         <div className="bg-surface border border-border rounded-xl p-4">
           <p className="text-2xl font-semibold tracking-tight tabular-nums mb-3">{formatCurrency(budget.monthlyIncome)}</p>
@@ -252,7 +252,7 @@ export default function Settings() {
         </div>
       </section>
 
-      <section className="mb-10">
+      <section className="mb-8">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xs font-medium text-muted/70 uppercase tracking-widest">Categorie</h2>
 
@@ -277,7 +277,7 @@ export default function Settings() {
         )}
       </section>
 
-      <section className="mb-10">
+      <section className="mb-8">
         <h2 className="text-xs font-medium text-muted/70 uppercase tracking-widest mb-4">Dati</h2>
         <div className="space-y-2">
           <button onClick={() => downloadJSON(budget, `financy-backup-${new Date().toISOString().slice(0, 10)}.json`)} className="w-full h-10 border border-border rounded-lg text-sm text-muted hover:text-muted-hover hover:bg-surface transition-colors">Esporta backup</button>
@@ -286,7 +286,7 @@ export default function Settings() {
         </div>
       </section>
 
-      <section className="mb-10">
+      <section className="mb-8">
         <h2 className="text-xs font-medium text-muted/70 uppercase tracking-widest mb-4">Aspetto</h2>
         <div className="bg-surface border border-border rounded-xl overflow-hidden">
           <button
@@ -311,7 +311,7 @@ export default function Settings() {
         </div>
       </section>
 
-      <section className="mb-10">
+      <section className="mb-8">
         <h2 className="text-xs font-medium text-muted/70 uppercase tracking-widest mb-4">Sicurezza</h2>
         <div className="bg-surface border border-border rounded-xl overflow-hidden divide-y divide-border">
           <div className="flex items-center justify-between py-3 px-4">
@@ -343,6 +343,8 @@ export default function Settings() {
           )}
         </div>
       </section>
+
+      <div className="h-px bg-border mb-8" />
 
       <section>
         <h2 className="text-xs font-medium text-muted/70 uppercase tracking-widest mb-4">Zona pericolosa</h2>

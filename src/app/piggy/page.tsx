@@ -33,13 +33,41 @@ export default function Piggy() {
     return { year, month: month - 1 };
   };
 
+  // polish: sparkline extracted from IIFE to named variable
+  const sparkline = sortedMonths.length >= 2 ? (() => {
+    const values = [...sortedMonths].reverse().map(([, m]) => m.saved);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min || 1;
+    const W = 280, H = 48, pad = 6;
+    const pts = values.map((v, i) => {
+      const x = pad + (i / (values.length - 1)) * (W - pad * 2);
+      const y = H - pad - ((v - min) / range) * (H - pad * 2);
+      return `${x},${y}`;
+    }).join(" ");
+    const lastPositive = values[values.length - 1] >= 0;
+    const strokeColor = lastPositive ? "var(--color-success)" : "var(--color-danger)";
+    return (
+      <div className="mb-6">
+        <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
+          <polyline points={pts} fill="none" stroke={strokeColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.7" />
+          {values.map((v, i) => {
+            const x = pad + (i / (values.length - 1)) * (W - pad * 2);
+            const y = H - pad - ((v - min) / range) * (H - pad * 2);
+            return <circle key={i} cx={x} cy={y} r="3" fill={v >= 0 ? "var(--color-success)" : "var(--color-danger)"} />;
+          })}
+        </svg>
+      </div>
+    );
+  })() : null;
+
   return (
     <div className="flex flex-col flex-1 max-w-lg mx-auto w-full px-6 pt-8" style={{ paddingBottom: "calc(6rem + env(safe-area-inset-bottom))" }}>
 
       {/* Header */}
       <div className="mb-8">
-        <p className="text-xs font-medium text-muted/70 uppercase tracking-widest mb-1">Salvadanaio</p>
-        <p className="text-3xl font-semibold tracking-tight tabular-nums">
+        <h1 className="text-xl font-semibold tracking-tight mb-1">Salvadanaio</h1>
+        <p className="text-3xl font-semibold tracking-tight tabular-nums text-success">
           {formatCurrency(piggyTotal)}
         </p>
         {last3Saved.length > 0 && (
@@ -52,39 +80,7 @@ export default function Piggy() {
       </div>
 
       {/* Sparkline trend */}
-      {sortedMonths.length >= 2 && (() => {
-        const values = [...sortedMonths].reverse().map(([, m]) => m.saved);
-        const min = Math.min(...values);
-        const max = Math.max(...values);
-        const range = max - min || 1;
-        const W = 280, H = 48, pad = 6;
-        const pts = values.map((v, i) => {
-          const x = pad + (i / (values.length - 1)) * (W - pad * 2);
-          const y = H - pad - ((v - min) / range) * (H - pad * 2);
-          return `${x},${y}`;
-        }).join(" ");
-        const lastPositive = values[values.length - 1] >= 0;
-        return (
-          <div className="mb-6">
-            <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
-              <polyline
-                points={pts}
-                fill="none"
-                stroke={lastPositive ? "var(--color-success)" : "var(--color-danger)"}
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                opacity="0.7"
-              />
-              {values.map((v, i) => {
-                const x = pad + (i / (values.length - 1)) * (W - pad * 2);
-                const y = H - pad - ((v - min) / range) * (H - pad * 2);
-                return <circle key={i} cx={x} cy={y} r="3" fill={v >= 0 ? "var(--color-success)" : "var(--color-danger)"} />;
-              })}
-            </svg>
-          </div>
-        );
-      })()}
+      {sparkline}
 
       <p className="text-xs font-medium text-muted/70 uppercase tracking-widest mb-3">Mesi chiusi</p>
 

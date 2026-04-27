@@ -153,18 +153,25 @@ export function EditExpenseSheet({ expense, categories, monthlyIncome, spentByCa
                 />
               </div>
 
-              <label className="flex items-center justify-between py-2 cursor-pointer">
-                <span className="flex items-center gap-2 text-sm">
-                  <span className="text-recurring font-mono" aria-hidden="true">↻</span>
-                  Spesa ricorrente
-                </span>
-                <input
-                  type="checkbox"
-                  checked={recurring}
-                  onChange={(e) => setRecurring(e.target.checked)}
-                  className="w-4 h-4 accent-accent cursor-pointer"
-                />
-              </label>
+              <div>
+                <label className="flex items-center justify-between py-2 cursor-pointer">
+                  <span className="flex items-center gap-2 text-sm">
+                    <span className="text-recurring font-mono" aria-hidden="true">↻</span>
+                    Spesa ricorrente
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={recurring}
+                    onChange={(e) => setRecurring(e.target.checked)}
+                    className="w-4 h-4 accent-accent cursor-pointer"
+                  />
+                </label>
+                {recurring && (
+                  <p className="text-xs text-muted pl-6">
+                    Verrà proposta di nuovo alla chiusura del mese.
+                  </p>
+                )}
+              </div>
             </div>
 
             <button
