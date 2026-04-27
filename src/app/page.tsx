@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useBudget } from "@/lib/context";
+import { isPinEnabled } from "@/lib/pin";
 
 export default function Home() {
   const { budget, isLoaded } = useBudget();
@@ -10,10 +11,12 @@ export default function Home() {
 
   useEffect(() => {
     if (!isLoaded) return;
-    if (budget) {
-      router.replace("/dashboard");
-    } else {
+    if (!budget) {
       router.replace("/onboarding");
+    } else if (isPinEnabled()) {
+      router.replace("/pin");
+    } else {
+      router.replace("/dashboard");
     }
   }, [budget, isLoaded, router]);
 

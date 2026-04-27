@@ -12,6 +12,7 @@ interface Props {
     amount: number;
     description: string;
     date: string;
+    recurring?: boolean;
   }) => void;
   onClose: () => void;
 }
@@ -22,6 +23,7 @@ export function AddExpenseSheet({ categories, monthlyIncome, spentByCategory, on
   const [description, setDescription] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [step, setStep] = useState<"category" | "amount" | "details">("category");
+  const [recurring, setRecurring] = useState(false);
 
   const amountRef = useRef<HTMLInputElement>(null);
   const descRef = useRef<HTMLInputElement>(null);
@@ -51,6 +53,7 @@ export function AddExpenseSheet({ categories, monthlyIncome, spentByCategory, on
       amount: amountNum,
       description: description.trim() || selectedCategory?.name || "",
       date,
+      recurring,
     });
     onClose();
   };
@@ -210,6 +213,19 @@ export function AddExpenseSheet({ categories, monthlyIncome, spentByCategory, on
                       className="w-full bg-background border border-border rounded-lg h-10 px-3 text-sm outline-none focus:border-accent transition-colors"
                     />
                   </div>
+
+                  <label className="flex items-center justify-between py-2 cursor-pointer">
+                    <span className="flex items-center gap-2 text-sm">
+                      <span className="text-warning" aria-hidden="true">↻</span>
+                      Spesa ricorrente
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={recurring}
+                      onChange={(e) => setRecurring(e.target.checked)}
+                      className="w-4 h-4 accent-accent cursor-pointer"
+                    />
+                  </label>
                 </div>
 
                 <button

@@ -89,7 +89,10 @@ export default function History() {
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cat?.color ?? "#888" }} aria-hidden="true" />
                   <div className="min-w-0">
-                    <p className={`text-sm truncate ${isPending ? "line-through opacity-50" : ""}`}>{expense.description || cat?.name}</p>
+                    <p className={`text-sm truncate ${isPending ? "line-through opacity-50" : ""}`}>
+                      {expense.description || cat?.name}
+                      {expense.recurring && <span className="text-warning text-xs ml-1.5" aria-label="Spesa ricorrente">↻</span>}
+                    </p>
                     <p className="text-xs text-muted mt-0.5"><span className="font-mono">{formatDate(expense.date)}</span>{cat && <><span className="mx-1.5 text-border" aria-hidden="true">·</span>{cat.name}</>}</p>
                   </div>
                 </div>

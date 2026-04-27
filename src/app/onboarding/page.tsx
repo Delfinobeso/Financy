@@ -3,71 +3,52 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useBudget } from "@/lib/context";
-import { DEFAULT_CATEGORIES, formatCurrency } from "@/lib/types";
+import { DEFAULT_CATEGORIES, formatCurrency, generateId } from "@/lib/types";
 
 export default function Onboarding() {
   const { setup } = useBudget();
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [income, setIncome] = useState("");
-  const [categories, setCategories] = useState(
-    DEFAULT_CATEGORIES.map((c) => ({ ...c, id: c.name.toLowerCase().replace(/\s+/g, "-") }))
+  const [amounts, setAmounts] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      DEFAULT_CATEGORIES.map((c) => [c.name, ""])
+    )
   );
 
-  const totalPercentage = useMemo(
-    () => categories.reduce((sum, c) => sum + c.percentage, 0),
-    [categories]
+  const incomeNum = parseFloat(income) || 0;
+
+  const totalAllocated = useMemo(
+    () => Object.values(amounts).reduce((s, v) => s + (parseFloat(v) || 0), 0),
+    [amounts]
   );
 
-  const handleIncomeChange = (value: string) => {
-    const cleaned = value.replace(/[^0-9]/g, "");
-    setIncome(cleaned);
-  };
+  const remaining = incomeNum - totalAllocated;
+  const isBalanced = Math.abs(remaining) < 0.01 && incomeNum > 0;
+  const allocatedPct = incomeNum > 0 ? Math.min((totalAllocated / incomeNum) * 100, 100) : 0;
 
-  const handlePercentageChange = (index: number, newValue: number) => {
-    setCategories((prev) => {
-      const oldValue = prev[index].percentage;
-      const delta = newValue - oldValue;
-      const others = prev
-        .map((c, i) => ({ i, pct: c.percentage }))
-        .filter((x) => x.i !== index);
-
-      const totalOtherPct = others.reduce((s, x) => s + x.pct, 0);
-
-      const next = prev.map((c, i) => {
-        if (i === index) return { ...c, percentage: newValue };
-        if (totalOtherPct > 0) {
-          const share = c.percentage / totalOtherPct;
-          return { ...c, percentage: Math.max(0, c.percentage - Math.round(delta * share)) };
-        }
-        return c;
-      });
-
-      const sum = next.reduce((s, c) => s + c.percentage, 0);
-      if (sum !== 100 && next.length > 1) {
-        let diff = 100 - sum;
-        const targetIndex = next.findIndex((_, i) => i !== index);
-        if (targetIndex >= 0) {
-          next[targetIndex] = {
-            ...next[targetIndex],
-            percentage: Math.max(0, next[targetIndex].percentage + diff),
-          };
-        }
-      }
-
-      return next;
+  const autofill = () => {
+    if (!incomeNum) return;
+    const filled: Record<string, string> = {};
+    DEFAULT_CATEGORIES.forEach((c) => {
+      filled[c.name] = String(Math.round((c.percentage / 100) * incomeNum));
     });
+    setAmounts(filled);
   };
 
   const handleFinish = () => {
-    const incomeNum = parseFloat(income);
-    if (!incomeNum || incomeNum <= 0) return;
-    if (totalPercentage !== 100) return;
+    if (!incomeNum || !isBalanced) return;
+    const categories = DEFAULT_CATEGORIES.map((c) => {
+      const amt = parseFloat(amounts[c.name]) || 0;
+      return {
+        ...c,
+        id: generateId(),
+        percentage: Math.round((amt / incomeNum) * 10000) / 100,
+      };
+    });
     setup(incomeNum, categories);
     router.replace("/dashboard");
   };
-
-  const incomeNum = parseFloat(income) || 0;
 
   return (
     <div className="flex flex-col flex-1 max-w-lg mx-auto w-full px-6 py-12">
@@ -109,7 +90,7 @@ export default function Onboarding() {
                   type="text"
                   inputMode="numeric"
                   value={income}
-                  onChange={(e) => handleIncomeChange(e.target.value)}
+                  onChange={(e) => setIncome(e.target.value.replace(/[^0-9]/g, ""))}
                   placeholder="0"
                   autoFocus
                   className="w-full bg-transparent text-5xl font-semibold tracking-tight pl-12 pr-4 py-6 border-b-2 border-border focus:border-accent outline-none transition-colors placeholder:text-muted/30"
@@ -134,75 +115,67 @@ export default function Onboarding() {
       )}
 
       {step === 1 && (
-        <div className="flex flex-col flex-1">
-          <div className="mb-8">
-            <p className="text-muted text-sm mb-2">Step 2 di 2</p>
-            <h1 className="text-2xl font-semibold tracking-tight mb-2">
-              Come vuoi suddividerlo?
-            </h1>
-            <p className="text-muted text-sm leading-relaxed">
-              Sposta uno slider e gli altri si adattano da soli per restare a 100%.
-            </p>
-          </div>
-
-          <div className="flex-1 space-y-8">
-            {categories.map((category, idx) => {
-              const amount = (incomeNum * category.percentage) / 100;
-              return (
-                <div key={category.id}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: category.color }}
-                        aria-hidden="true"
-                      />
-                      <span className="text-sm font-medium">{category.name}</span>
-                    </div>
-                    <span className="text-sm font-mono tabular-nums">
-                      <span className="text-muted">{category.percentage}%</span>
-                      <span className="text-muted mx-2">—</span>
-                      {formatCurrency(amount)}
-                    </span>
-                  </div>
-                  <label htmlFor={`slider-${category.id}`} className="sr-only">
-                    {category.name}: {category.percentage}%
-                  </label>
-                  <input
-                    id={`slider-${category.id}`}
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={category.percentage}
-                    onChange={(e) => handlePercentageChange(idx, parseInt(e.target.value))}
-                    className="w-full h-1.5 rounded-full appearance-none cursor-pointer focus-visible:ring-2 focus-visible:ring-accent outline-none"
-                    style={{
-                      background: `linear-gradient(to right, ${category.color} 0%, ${category.color} ${category.percentage}%, #1f1f1f ${category.percentage}%, #1f1f1f 100%)`,
-                      accentColor: category.color,
-                    }}
-                  />
-                </div>
-              );
-            })}
-
-            <div
-              className={`flex items-center justify-between py-3 px-4 rounded-lg border ${
-                totalPercentage === 100
-                  ? "border-success/30 bg-success/5 text-success"
-                  : "border-danger/30 bg-danger/5 text-danger"
-              }`}
-              role="status"
-              aria-live="polite"
-              aria-label={`Totale allocazione: ${totalPercentage}%. ${totalPercentage === 100 ? "Bilanciato" : "Deve essere 100%"}`}
-            >
-              <span className="text-sm font-mono">Totale</span>
-              <span className="text-sm font-mono tabular-nums font-medium">
-                {totalPercentage}%
-              </span>
+        <div className="flex flex-col flex-1 min-h-0">
+          <div className="mb-6 shrink-0">
+            <div className="flex items-start justify-between mb-1">
+              <div>
+                <p className="text-muted text-sm mb-1">Step 2 di 2</p>
+                <h1 className="text-2xl font-semibold tracking-tight">
+                  Come vuoi suddividerlo?
+                </h1>
+              </div>
+              <button
+                onClick={autofill}
+                className="mt-1 text-xs text-accent border border-accent/30 rounded-lg px-3 py-1.5 hover:bg-accent/10 transition-colors shrink-0"
+              >
+                Usa consigliati
+              </button>
+            </div>
+            <div className="mt-4">
+              <div className="flex justify-between text-xs text-muted mb-1.5">
+                <span>Allocato</span>
+                <span className={`font-mono tabular-nums ${isBalanced ? "text-success" : remaining < 0 ? "text-danger" : ""}`}>
+                  {remaining >= 0
+                    ? `${formatCurrency(remaining)} rimanenti`
+                    : `${formatCurrency(Math.abs(remaining))} in eccesso`}
+                </span>
+              </div>
+              <div className="h-1.5 rounded-full bg-border overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${remaining < 0 ? "bg-danger" : isBalanced ? "bg-success" : "bg-accent"}`}
+                  style={{ width: `${allocatedPct}%` }}
+                />
+              </div>
             </div>
           </div>
 
-          <div className="flex gap-3 mt-8">
+          <div className="flex-1 overflow-y-auto space-y-2 pb-4">
+            {DEFAULT_CATEGORIES.map((cat) => {
+              const suggested = Math.round((cat.percentage / 100) * incomeNum);
+              return (
+                <div key={cat.name} className="flex items-center gap-3 py-2.5 px-3 rounded-lg bg-surface">
+                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: cat.color }} aria-hidden="true" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{cat.name}</p>
+                    <p className="text-xs text-muted">{cat.percentage}% suggerito · {formatCurrency(suggested)}</p>
+                  </div>
+                  <div className="relative shrink-0">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-muted" aria-hidden="true">€</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={amounts[cat.name]}
+                      onChange={(e) => setAmounts((prev) => ({ ...prev, [cat.name]: e.target.value.replace(/[^0-9.]/g, "") }))}
+                      placeholder={String(suggested)}
+                      className="w-24 bg-background border border-border rounded-lg h-9 pl-6 pr-2 text-sm font-mono text-right outline-none focus:border-accent transition-colors placeholder:text-muted/40"
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex gap-3 pt-4 shrink-0">
             <button
               onClick={() => setStep(0)}
               className="h-12 px-6 border border-border rounded-lg text-sm font-medium hover:bg-surface transition-colors focus-visible:ring-2 focus-visible:ring-accent outline-none"
@@ -211,7 +184,7 @@ export default function Onboarding() {
             </button>
             <button
               onClick={handleFinish}
-              disabled={totalPercentage !== 100}
+              disabled={!isBalanced}
               className="flex-1 h-12 bg-foreground text-background font-medium rounded-lg disabled:opacity-20 disabled:cursor-not-allowed hover:bg-muted-hover transition-colors focus-visible:ring-2 focus-visible:ring-accent outline-none"
             >
               Inizia a usare Financy

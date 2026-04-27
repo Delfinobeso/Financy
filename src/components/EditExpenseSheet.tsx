@@ -17,6 +17,7 @@ export function EditExpenseSheet({ expense, categories, monthlyIncome, spentByCa
   const [amount, setAmount] = useState(expense.amount.toString());
   const [description, setDescription] = useState(expense.description);
   const [date, setDate] = useState(expense.date);
+  const [recurring, setRecurring] = useState(expense.recurring ?? false);
 
   const amountRef = useRef<HTMLInputElement>(null);
 
@@ -43,6 +44,7 @@ export function EditExpenseSheet({ expense, categories, monthlyIncome, spentByCa
       amount: amountNum,
       description: description.trim() || selectedCategory?.name || "",
       date,
+      recurring,
     });
     onClose();
   };
@@ -148,6 +150,19 @@ export function EditExpenseSheet({ expense, categories, monthlyIncome, spentByCa
                   className="w-full bg-background border border-border rounded-lg h-10 px-3 text-sm outline-none focus:border-accent transition-colors"
                 />
               </div>
+
+              <label className="flex items-center justify-between py-2 cursor-pointer">
+                <span className="flex items-center gap-2 text-sm">
+                  <span className="text-warning" aria-hidden="true">↻</span>
+                  Spesa ricorrente
+                </span>
+                <input
+                  type="checkbox"
+                  checked={recurring}
+                  onChange={(e) => setRecurring(e.target.checked)}
+                  className="w-4 h-4 accent-accent cursor-pointer"
+                />
+              </label>
             </div>
 
             <button

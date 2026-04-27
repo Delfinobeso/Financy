@@ -2,21 +2,22 @@
 
 import Link from "next/link";
 
-type Tab = "dashboard" | "history" | "settings";
+type Tab = "dashboard" | "history" | "piggy" | "settings";
 
 export function BottomNav({ active }: { active: Tab }) {
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-background border-t border-border z-40" aria-label="Navigazione principale">
       <div className="max-w-lg mx-auto flex">
-        <NavTab href="/dashboard" icon="grid" label="Dashboard" active={active === "dashboard"} />
+        <NavTab href="/dashboard" icon="grid" label="Budget" active={active === "dashboard"} />
         <NavTab href="/history" icon="clock" label="Storico" active={active === "history"} />
+        <NavTab href="/piggy" icon="piggy" label="Salvadanaio" active={active === "piggy"} />
         <NavTab href="/settings" icon="gear" label="Impostazioni" active={active === "settings"} />
       </div>
     </nav>
   );
 }
 
-function NavTab({ href, icon, label, active }: { href: string; icon: "grid" | "clock" | "gear"; label: string; active: boolean }) {
+function NavTab({ href, icon, label, active }: { href: string; icon: "grid" | "clock" | "piggy" | "gear"; label: string; active: boolean }) {
   return (
     <Link
       href={href}
@@ -39,6 +40,12 @@ function NavTab({ href, icon, label, active }: { href: string; icon: "grid" | "c
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
           <circle cx="9" cy="9" r="7" />
           <path d="M9 5v4l2.5 2.5" />
+        </svg>
+      )}
+      {icon === "piggy" && (
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M16 8c0-.55-.05-1.08-.15-1.59A2 2 0 0 0 14 5h-.5A5 5 0 0 0 4 7H3a2 2 0 0 0-2 2v1a2 2 0 0 0 2 2h.18A5 5 0 0 0 7 14.9V16h1v1h2v-1h1v-1.1A5 5 0 0 0 14 11h.5a1 1 0 0 0 .95-.68A8.1 8.1 0 0 0 16 8z" />
+          <circle cx="12" cy="8" r="0.75" fill="currentColor" />
         </svg>
       )}
       {icon === "gear" && (

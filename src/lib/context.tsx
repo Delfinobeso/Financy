@@ -9,7 +9,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import type { Budget, Expense, Category, CategoryId } from "@/lib/types";
+import type { Budget, Expense, Category, CategoryId, ClosedMonth } from "@/lib/types";
 import { generateId } from "@/lib/types";
 
 const STORAGE_KEY = "financy-budget";
@@ -44,6 +44,7 @@ type Action =
   | { type: "ADD_CATEGORY"; category: Category }
   | { type: "EDIT_CATEGORY"; category: Category }
   | { type: "DELETE_CATEGORY"; id: string; migrateTo: CategoryId }
+  | { type: "CLOSE_MONTH"; monthKey: string; closedMonth: ClosedMonth }
   | { type: "RESET" };
 
 function budgetReducer(state: Budget | null, action: Action): Budget | null {
@@ -57,6 +58,8 @@ function budgetReducer(state: Budget | null, action: Action): Budget | null {
         monthlyIncome: action.income,
         categories: action.categories,
         expenses: [],
+        closedMonths: {},
+        piggyBankTotal: 0,
         createdAt: now,
         updatedAt: now,
       };
@@ -134,6 +137,22 @@ function budgetReducer(state: Budget | null, action: Action): Budget | null {
       return updated;
     }
 
+    case "CLOSE_MONTH": {
+      if (!state) return state;
+      const prevPiggy = state.piggyBankTotal ?? 0;
+      const updated: Budget = {
+        ...state,
+        closedMonths: {
+          ...(state.closedMonths ?? {}),
+          [action.monthKey]: action.closedMonth,
+        },
+        piggyBankTotal: prevPiggy + action.closedMonth.saved,
+        updatedAt: new Date().toISOString(),
+      };
+      saveBudget(updated);
+      return updated;
+    }
+
     case "DELETE_CATEGORY": {
       if (!state) return state;
       const updated: Budget = {
@@ -172,6 +191,7 @@ interface BudgetContextType {
   addCategory: (category: Category) => void;
   editCategory: (category: Category) => void;
   deleteCategory: (id: string, migrateTo: CategoryId) => void;
+  closeMonth: (monthKey: string, saved: number, spent: number, budget: number) => void;
   reset: () => void;
 }
 
@@ -199,10 +219,10 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addExpense = useCallback(
-    ({ categoryId, amount, description, date }: Omit<Expense, "id">) => {
+    ({ categoryId, amount, description, date, recurring }: Omit<Expense, "id">) => {
       dispatch({
         type: "ADD_EXPENSE",
-        expense: { id: generateId(), categoryId, amount, description, date },
+        expense: { id: generateId(), categoryId, amount, description, date, recurring },
       });
     },
     []
@@ -228,6 +248,17 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "DELETE_CATEGORY", id, migrateTo });
   }, []);
 
+  const closeMonth = useCallback(
+    (monthKey: string, saved: number, spent: number, budget: number) => {
+      dispatch({
+        type: "CLOSE_MONTH",
+        monthKey,
+        closedMonth: { saved, spent, budget, closedAt: new Date().toISOString() },
+      });
+    },
+    []
+  );
+
   const reset = useCallback(() => {
     dispatch({ type: "RESET" });
   }, []);
@@ -245,6 +276,7 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
         addCategory,
         editCategory,
         deleteCategory,
+        closeMonth,
         reset,
       }}
     >

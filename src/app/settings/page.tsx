@@ -11,6 +11,9 @@ import {
   type Category,
 } from "@/lib/types";
 import { BottomNav } from "@/components/BottomNav";
+import { PinPad } from "@/components/PinPad";
+import { isPinEnabled, setPin, clearPin } from "@/lib/pin";
+import { getTheme, setTheme, type Theme } from "@/lib/theme";
 
 function CategoryEditor({
   category,
@@ -77,6 +80,18 @@ export default function Settings() {
   const [newCatPct, setNewCatPct] = useState(10);
   const [showResetDialog, setShowResetDialog] = useState(false);
 
+  // PIN state
+  const [pinEnabled, setPinEnabled] = useState(() => isPinEnabled());
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinModalMode, setPinModalMode] = useState<"create" | "confirm">("create");
+  const [pinInput, setPinInput] = useState("");
+  const [pinFirst, setPinFirst] = useState("");
+  const [pinLabel, setPinLabel] = useState("Nuovo PIN a 4 cifre");
+  const [pinError, setPinError] = useState(false);
+
+  // Theme state
+  const [theme, setCurrentTheme] = useState<Theme>(() => getTheme());
+
   if (!budget) return null;
 
   const totalPercentage = budget.categories.reduce((s, c) => s + c.percentage, 0);
@@ -90,6 +105,53 @@ export default function Settings() {
     if (!newCatName.trim()) return;
     addCategory({ id: generateId(), name: newCatName.trim(), percentage: newCatPct, color: CATEGORY_COLORS[budget.categories.length % CATEGORY_COLORS.length] });
     setNewCatName(""); setNewCatPct(10); setShowNewCategory(false);
+  };
+
+  const handleToggleTheme = () => {
+    const next: Theme = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    setCurrentTheme(next);
+  };
+
+  const openSetupPin = () => {
+    setPinModalMode("create");
+    setPinInput("");
+    setPinFirst("");
+    setPinLabel("Nuovo PIN a 4 cifre");
+    setPinError(false);
+    setShowPinModal(true);
+  };
+
+  const handlePinInput = (v: string) => {
+    setPinInput(v);
+    if (v.length < 4) return;
+    if (pinModalMode === "create") {
+      setPinFirst(v);
+      setPinInput("");
+      setPinModalMode("confirm");
+      setPinLabel("Conferma il PIN");
+    } else {
+      if (v === pinFirst) {
+        setPin(v);
+        setPinEnabled(true);
+        setShowPinModal(false);
+      } else {
+        setPinError(true);
+        setPinLabel("I PIN non coincidono.");
+        setTimeout(() => {
+          setPinInput("");
+          setPinFirst("");
+          setPinError(false);
+          setPinModalMode("create");
+          setPinLabel("Nuovo PIN a 4 cifre");
+        }, 900);
+      }
+    }
+  };
+
+  const handleDisablePin = () => {
+    clearPin();
+    setPinEnabled(false);
   };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -166,6 +228,64 @@ export default function Settings() {
         </div>
       </section>
 
+      <section className="mb-10">
+        <h2 className="text-xs tracking-wider text-muted mb-4">Aspetto</h2>
+        <div className="bg-surface border border-border rounded-xl overflow-hidden">
+          <button
+            onClick={handleToggleTheme}
+            className="w-full flex items-center justify-between py-3 px-4 hover:bg-background transition-colors"
+          >
+            <span className="text-sm">Tema</span>
+            <div className="flex items-center gap-2 text-muted text-sm">
+              <span>{theme === "dark" ? "Scuro" : "Chiaro"}</span>
+              {theme === "dark" ? (
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                  <circle cx="8" cy="8" r="3" />
+                  <path d="M8 1v1.5M8 13.5V15M1 8h1.5M13.5 8H15M3.2 3.2l1.1 1.1M11.7 11.7l1.1 1.1M3.2 12.8l1.1-1.1M11.7 4.3l1.1-1.1" />
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                  <path d="M14 8.5A6 6 0 0 1 7.5 2a6 6 0 1 0 6.5 6.5z" />
+                </svg>
+              )}
+            </div>
+          </button>
+        </div>
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-xs tracking-wider text-muted mb-4">Sicurezza</h2>
+        <div className="bg-surface border border-border rounded-xl overflow-hidden divide-y divide-border">
+          <div className="flex items-center justify-between py-3 px-4">
+            <div>
+              <p className="text-sm font-medium">PIN di sblocco</p>
+              <p className="text-xs text-muted mt-0.5">{pinEnabled ? "Attivo" : "Non impostato"}</p>
+            </div>
+            <button
+              onClick={pinEnabled ? handleDisablePin : openSetupPin}
+              className={`h-8 px-3 text-xs font-medium rounded-lg border transition-colors ${
+                pinEnabled
+                  ? "border-danger/30 text-danger hover:bg-danger/10"
+                  : "border-accent/30 text-accent hover:bg-accent/10"
+              }`}
+            >
+              {pinEnabled ? "Disattiva" : "Attiva"}
+            </button>
+          </div>
+          {pinEnabled && (
+            <button
+              onClick={openSetupPin}
+              className="w-full flex items-center justify-between py-3 px-4 hover:bg-background transition-colors text-left"
+            >
+              <span className="text-sm">Cambia PIN</span>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted" aria-hidden="true">
+                <path d="M5 3l4 4-4 4" />
+              </svg>
+            </button>
+          )}
+        </div>
+      </section>
+
       <section>
         <h2 className="text-xs tracking-wider text-muted mb-4">Zona pericolosa</h2>
         <button onClick={() => setShowResetDialog(true)} className="w-full h-10 border border-danger/30 text-danger rounded-lg text-sm hover:bg-danger/10 transition-colors">Resetta tutti i dati</button>
@@ -174,6 +294,26 @@ export default function Settings() {
       <p className="text-center text-muted/40 text-xs mt-12 mb-24">Financy v1.0 — I tuoi dati sono salvati solo su questo dispositivo</p>
 
       <BottomNav active="settings" />
+
+      {showPinModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-[oklch(0_0_0/0.6)]" onClick={() => setShowPinModal(false)} />
+          <div className="relative bg-surface border border-border rounded-2xl p-6 mx-6 max-w-sm w-full motion-safe:animate-slide-up flex flex-col items-center gap-4" role="dialog" aria-label="Imposta PIN">
+            <h3 className="text-lg font-semibold tracking-tight self-start">
+              {pinModalMode === "create" ? "Imposta PIN" : "Conferma PIN"}
+            </h3>
+            <PinPad
+              value={pinInput}
+              onChange={handlePinInput}
+              label={pinLabel}
+              error={pinError}
+            />
+            <button onClick={() => setShowPinModal(false)} className="text-sm text-muted hover:text-muted-hover transition-colors">
+              Annulla
+            </button>
+          </div>
+        </div>
+      )}
 
       {showResetDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">

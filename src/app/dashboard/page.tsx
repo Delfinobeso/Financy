@@ -1,14 +1,17 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useBudget } from "@/lib/context";
 import {
-  calculateBudget,
+  calculateBudgetForMonth,
   getCategoryBudget,
   getRemaining,
   formatCurrency,
   formatDate,
+  formatMonthLabel,
+  getMonthKey,
   type Expense,
 } from "@/lib/types";
 import { AddExpenseSheet } from "@/components/AddExpenseSheet";
@@ -17,22 +20,52 @@ import { BottomNav } from "@/components/BottomNav";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 
 export default function Dashboard() {
-  const { budget, isLoaded, addExpense, editExpense, deleteExpense, reset } = useBudget();
+  const { budget, isLoaded, addExpense, editExpense, deleteExpense, closeMonth, reset } = useBudget();
+  const router = useRouter();
+
+  const now = new Date();
+  const [viewYear, setViewYear] = useState(now.getFullYear());
+  const [viewMonth, setViewMonth] = useState(now.getMonth());
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [showResetDialog, setShowResetDialog] = useState(false);
+  const [showCloseModal, setShowCloseModal] = useState(false);
   const [highlightedCategory, setHighlightedCategory] = useState<string | null>(null);
   const [ringPulse, setRingPulse] = useState(false);
 
   const { pendingIds, requestDelete, undoDelete } = useUndoDelete(deleteExpense);
 
+  const isCurrentMonth = viewYear === now.getFullYear() && viewMonth === now.getMonth();
+  const isPastMonth =
+    viewYear < now.getFullYear() ||
+    (viewYear === now.getFullYear() && viewMonth < now.getMonth());
+
+  const goToPrevMonth = () => {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear((y) => y - 1); }
+    else setViewMonth((m) => m - 1);
+  };
+
+  const goToNextMonth = () => {
+    if (isCurrentMonth) return;
+    if (viewMonth === 11) { setViewMonth(0); setViewYear((y) => y + 1); }
+    else setViewMonth((m) => m + 1);
+  };
+
+  const monthExpenses = useMemo(() => {
+    if (!budget) return [];
+    return budget.expenses.filter((e) => {
+      const d = new Date(e.date);
+      return d.getFullYear() === viewYear && d.getMonth() === viewMonth;
+    });
+  }, [budget, viewYear, viewMonth]);
+
   const spentByCategory = useMemo(() => {
     if (!budget) return new Map<string, number>();
-    return calculateBudget(budget);
-  }, [budget]);
+    return calculateBudgetForMonth(budget, viewYear, viewMonth);
+  }, [budget, viewYear, viewMonth]);
 
   const handleAdd = useCallback(
-    (expense: { categoryId: string; amount: number; description: string; date: string }) => {
+    (expense: { categoryId: string; amount: number; description: string; date: string; recurring?: boolean }) => {
       addExpense(expense);
       setShowAddSheet(false);
       setHighlightedCategory(expense.categoryId);
@@ -53,28 +86,67 @@ export default function Dashboard() {
 
   if (!budget) return null;
 
-  const recentExpenses = [...budget.expenses]
+  const recentExpenses = [...monthExpenses]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 5);
 
-  const totalSpent = budget.expenses.reduce((sum, e) => sum + e.amount, 0);
+  const totalSpent = monthExpenses.reduce((sum, e) => sum + e.amount, 0);
   const totalRemaining = budget.monthlyIncome - totalSpent;
   const spentPercent = Math.min((totalSpent / budget.monthlyIncome) * 100, 100);
+
+  const monthKey = getMonthKey(viewYear, viewMonth);
+  const isMonthClosed = !!(budget.closedMonths?.[monthKey]);
+  const showCloseBanner = isCurrentMonth && !isMonthClosed && monthExpenses.length > 0;
+
+  const handleCloseMonth = () => {
+    closeMonth(monthKey, totalRemaining, totalSpent, budget.monthlyIncome);
+    setShowCloseModal(false);
+    router.push("/piggy");
+  };
 
   return (
     <div className="flex flex-col flex-1 max-w-lg mx-auto w-full px-6 pb-24">
       <header className="py-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">Financy</h1>
-            <p className="text-muted text-sm mt-0.5">Il tuo budget mensile</p>
-          </div>
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-xl font-semibold tracking-tight">Financy</h1>
           <button
             onClick={() => setShowResetDialog(true)}
             className="text-muted hover:text-muted-hover transition-colors text-sm"
             aria-label="Resetta tutti i dati"
           >
             Reset
+          </button>
+        </div>
+
+        {/* Month navigation */}
+        <div className="flex items-center justify-between mb-6">
+          <button
+            onClick={goToPrevMonth}
+            className="w-8 h-8 flex items-center justify-center rounded-lg border border-border hover:bg-surface transition-colors"
+            aria-label="Mese precedente"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+              <path d="M9 3L5 7l4 4" />
+            </svg>
+          </button>
+          <div className="text-center">
+            <p className="text-sm font-medium">{formatMonthLabel(viewYear, viewMonth)}</p>
+            {isPastMonth && (
+              <p className="text-xs text-muted mt-0.5">Mese passato · sola lettura</p>
+            )}
+            {isMonthClosed && (
+              <p className="text-xs text-success mt-0.5">Mese chiuso ✓</p>
+            )}
+          </div>
+          <button
+            onClick={goToNextMonth}
+            disabled={isCurrentMonth}
+            className="w-8 h-8 flex items-center justify-center rounded-lg border border-border hover:bg-surface transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            aria-label="Mese successivo"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+              <path d="M5 3l4 4-4 4" />
+            </svg>
           </button>
         </div>
 
@@ -109,6 +181,24 @@ export default function Dashboard() {
           </div>
         </div>
       </header>
+
+      {/* Close month banner */}
+      {showCloseBanner && (
+        <div className="mb-6 flex items-center gap-3 bg-warning/5 border border-warning/25 rounded-xl p-4">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-warning">Fine mese</p>
+            <p className="text-xs text-muted mt-0.5">
+              Avanzo di {formatCurrency(totalRemaining)} — chiudi il mese per salvarlo nel salvadanaio
+            </p>
+          </div>
+          <button
+            onClick={() => setShowCloseModal(true)}
+            className="shrink-0 h-8 px-3 bg-warning text-background text-xs font-semibold rounded-lg hover:opacity-90 transition-opacity"
+          >
+            Chiudi
+          </button>
+        </div>
+      )}
 
       <section className="mb-8">
         <h2 className="text-xs tracking-wider text-muted mb-4">Categorie</h2>
@@ -156,8 +246,8 @@ export default function Dashboard() {
         {recentExpenses.length === 0 ? (
           <div className="py-12 text-center">
             <p className="text-4xl mb-3" aria-hidden="true">💶</p>
-            <p className="text-muted text-sm">Il tuo budget è intatto</p>
-            <p className="text-muted/50 text-xs mt-1">Aggiungi la prima spesa per iniziare a tracciare</p>
+            <p className="text-muted text-sm">Nessuna spesa questo mese</p>
+            {!isPastMonth && <p className="text-muted/50 text-xs mt-1">Aggiungi la prima spesa per iniziare a tracciare</p>}
           </div>
         ) : (
           <div className="space-y-1">
@@ -167,13 +257,16 @@ export default function Dashboard() {
               return (
                 <button
                   key={expense.id}
-                  onClick={() => !isPending && setEditingExpense(expense)}
-                  className={`w-full flex items-center justify-between py-3 px-3 rounded-lg transition-colors group text-left ${isPending ? "bg-danger/5 cursor-default" : "hover:bg-surface cursor-pointer"}`}
+                  onClick={() => !isPending && !isPastMonth && setEditingExpense(expense)}
+                  className={`w-full flex items-center justify-between py-3 px-3 rounded-lg transition-colors group text-left ${isPending ? "bg-danger/5 cursor-default" : isPastMonth ? "cursor-default" : "hover:bg-surface cursor-pointer"}`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cat?.color ?? "#888" }} aria-hidden="true" />
                     <div className="min-w-0">
-                      <p className={`text-sm truncate ${isPending ? "line-through opacity-50" : ""}`}>{expense.description || cat?.name}</p>
+                      <p className={`text-sm truncate ${isPending ? "line-through opacity-50" : ""}`}>
+                        {expense.description || cat?.name}
+                        {expense.recurring && <span className="text-warning text-xs ml-1.5" aria-label="Spesa ricorrente">↻</span>}
+                      </p>
                       <p className="text-xs text-muted font-mono mt-0.5">{formatDate(expense.date)}<span className="mx-1.5 text-border" aria-hidden="true">·</span><span>{cat?.name}</span></p>
                     </div>
                   </div>
@@ -181,30 +274,33 @@ export default function Dashboard() {
                     <span className={`text-sm font-mono tabular-nums ${isPending ? "opacity-50" : ""}`}>{formatCurrency(expense.amount)}</span>
                     {isPending ? (
                       <button onClick={(e) => { e.stopPropagation(); undoDelete(expense.id); }} className="text-accent text-xs font-medium hover:underline">Annulla</button>
-                    ) : (
+                    ) : !isPastMonth ? (
                       <button onClick={(e) => { e.stopPropagation(); requestDelete(expense.id); }} className="text-muted hover:text-danger opacity-0 group-hover:opacity-100 transition-all text-xs"
                         aria-label={`Elimina spesa: ${expense.description || cat?.name}`}>Elimina</button>
-                    )}
+                    ) : null}
                   </div>
                 </button>
               );
             })}
-            {budget.expenses.length > 5 && (
+            {monthExpenses.length > 5 && (
               <Link href="/history" className="block text-center text-sm text-muted hover:text-muted-hover py-3 transition-colors">
-                Vedi tutte ({budget.expenses.length})
+                Vedi tutte ({monthExpenses.length})
               </Link>
             )}
           </div>
         )}
       </section>
 
-      <button
-        onClick={() => setShowAddSheet(true)}
-        className="fixed bottom-20 right-1/2 translate-x-1/2 max-w-lg w-[calc(100%-3rem)] h-12 bg-foreground text-background font-medium rounded-xl hover:bg-muted-hover transition-colors shadow-lg focus-visible:ring-2 focus-visible:ring-accent outline-none z-30"
-        aria-label="Aggiungi una nuova spesa"
-      >
-        Aggiungi spesa
-      </button>
+      {/* FAB — hidden for past months */}
+      {!isPastMonth && (
+        <button
+          onClick={() => setShowAddSheet(true)}
+          className="fixed bottom-20 right-1/2 translate-x-1/2 max-w-lg w-[calc(100%-3rem)] h-12 bg-foreground text-background font-medium rounded-xl hover:bg-muted-hover transition-colors shadow-lg focus-visible:ring-2 focus-visible:ring-accent outline-none z-30"
+          aria-label="Aggiungi una nuova spesa"
+        >
+          Aggiungi spesa
+        </button>
+      )}
 
       <BottomNav active="dashboard" />
 
@@ -227,6 +323,42 @@ export default function Dashboard() {
           onSave={(e) => { editExpense(e); setEditingExpense(null); }}
           onClose={() => setEditingExpense(null)}
         />
+      )}
+
+      {/* Close month modal */}
+      {showCloseModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-[oklch(0_0_0/0.6)]" onClick={() => setShowCloseModal(false)} />
+          <div className="relative bg-surface border border-border rounded-2xl p-6 mx-6 max-w-sm w-full motion-safe:animate-slide-up" role="alertdialog" aria-labelledby="close-month-title">
+            <h3 id="close-month-title" className="text-lg font-semibold tracking-tight mb-4">Chiudi {formatMonthLabel(viewYear, viewMonth)}</h3>
+            <div className="space-y-3 mb-6">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted">Budget mensile</span>
+                <span className="font-mono tabular-nums">{formatCurrency(budget.monthlyIncome)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted">Totale speso</span>
+                <span className="font-mono tabular-nums text-danger">{formatCurrency(totalSpent)}</span>
+              </div>
+              <div className="h-px bg-border" />
+              <div className="flex justify-between text-sm font-semibold">
+                <span>{totalRemaining >= 0 ? "Avanzo" : "Deficit"}</span>
+                <span className={`font-mono tabular-nums ${totalRemaining >= 0 ? "text-success" : "text-danger"}`}>
+                  {formatCurrency(Math.abs(totalRemaining))}
+                </span>
+              </div>
+            </div>
+            {totalRemaining > 0 && (
+              <p className="text-xs text-muted mb-6">
+                L&apos;avanzo di {formatCurrency(totalRemaining)} verrà salvato nel salvadanaio.
+              </p>
+            )}
+            <div className="flex gap-3">
+              <button onClick={() => setShowCloseModal(false)} className="flex-1 h-10 border border-border rounded-lg text-sm font-medium hover:bg-surface transition-colors">Annulla</button>
+              <button onClick={handleCloseMonth} className="flex-1 h-10 bg-foreground text-background text-sm font-medium rounded-lg hover:bg-muted-hover transition-colors">Chiudi mese</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showResetDialog && (
