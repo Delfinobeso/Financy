@@ -176,16 +176,11 @@ export default function Settings() {
   return (
     <div className="flex flex-col flex-1 max-w-lg mx-auto w-full px-6 py-8">
       <header className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <Link href="/dashboard" className="w-8 h-8 flex items-center justify-center rounded-lg border border-border hover:bg-surface transition-colors focus-visible:ring-2 focus-visible:ring-accent outline-none" aria-label="Torna alla dashboard">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M9 3L5 7l4 4" /></svg>
-          </Link>
-          <h1 className="text-xl font-semibold tracking-tight">Impostazioni</h1>
-        </div>
+        <h1 className="text-xl font-semibold tracking-tight">Impostazioni</h1>
       </header>
 
       <section className="mb-10">
-        <h2 className="text-xs tracking-wider text-muted mb-4">Reddito mensile</h2>
+        <h2 className="text-xs font-medium text-muted/70 uppercase tracking-widest mb-3">Reddito mensile</h2>
         <div className="bg-surface border border-border rounded-xl p-4">
           <p className="text-2xl font-semibold tracking-tight tabular-nums mb-3">{formatCurrency(budget.monthlyIncome)}</p>
           <div className="flex gap-2">
@@ -197,7 +192,8 @@ export default function Settings() {
 
       <section className="mb-10">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xs tracking-wider text-muted">Categorie</h2>
+          <h2 className="text-xs font-medium text-muted/70 uppercase tracking-widest">Categorie</h2>
+
           <span className={`text-xs font-mono tabular-nums ${totalPercentage === 100 ? "text-success" : "text-warning"}`}>Totale: {totalPercentage}%</span>
         </div>
         <div className="space-y-1">
@@ -220,7 +216,7 @@ export default function Settings() {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-xs tracking-wider text-muted mb-4">Dati</h2>
+        <h2 className="text-xs font-medium text-muted/70 uppercase tracking-widest mb-4">Dati</h2>
         <div className="space-y-2">
           <button onClick={() => downloadJSON(budget, `financy-backup-${new Date().toISOString().slice(0, 10)}.json`)} className="w-full h-10 border border-border rounded-lg text-sm text-muted hover:text-muted-hover hover:bg-surface transition-colors">Esporta backup</button>
           <button onClick={() => fileRef.current?.click()} className="w-full h-10 border border-border rounded-lg text-sm text-muted hover:text-muted-hover hover:bg-surface transition-colors">Importa backup</button>
@@ -229,7 +225,7 @@ export default function Settings() {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-xs tracking-wider text-muted mb-4">Aspetto</h2>
+        <h2 className="text-xs font-medium text-muted/70 uppercase tracking-widest mb-4">Aspetto</h2>
         <div className="bg-surface border border-border rounded-xl overflow-hidden">
           <button
             onClick={handleToggleTheme}
@@ -254,7 +250,7 @@ export default function Settings() {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-xs tracking-wider text-muted mb-4">Sicurezza</h2>
+        <h2 className="text-xs font-medium text-muted/70 uppercase tracking-widest mb-4">Sicurezza</h2>
         <div className="bg-surface border border-border rounded-xl overflow-hidden divide-y divide-border">
           <div className="flex items-center justify-between py-3 px-4">
             <div>
@@ -287,7 +283,7 @@ export default function Settings() {
       </section>
 
       <section>
-        <h2 className="text-xs tracking-wider text-muted mb-4">Zona pericolosa</h2>
+        <h2 className="text-xs font-medium text-muted/70 uppercase tracking-widest mb-4">Zona pericolosa</h2>
         <button onClick={() => setShowResetDialog(true)} className="w-full h-10 border border-danger/30 text-danger rounded-lg text-sm hover:bg-danger/10 transition-colors">Resetta tutti i dati</button>
       </section>
 

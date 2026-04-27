@@ -153,7 +153,7 @@ export function EditExpenseSheet({ expense, categories, monthlyIncome, spentByCa
 
               <label className="flex items-center justify-between py-2 cursor-pointer">
                 <span className="flex items-center gap-2 text-sm">
-                  <span className="text-warning" aria-hidden="true">↻</span>
+                  <span className="text-recurring font-mono" aria-hidden="true">↻</span>
                   Spesa ricorrente
                 </span>
                 <input

@@ -14,59 +14,73 @@ export function PinPad({ value, onChange, maxLength = 4, label, error }: Props) 
   const handleKey = (key: string) => {
     if (key === "⌫") {
       onChange(value.slice(0, -1));
-    } else if (key === "") {
-      // ghost cell — no action
-    } else if (value.length < maxLength) {
+    } else if (key !== "" && value.length < maxLength) {
       onChange(value + key);
     }
   };
 
   return (
-    <div className="flex flex-col items-center gap-6 w-full">
+    <div className="flex flex-col items-center gap-5 w-full">
       {/* Dot indicators */}
-      <div className="flex gap-4" aria-label={`PIN: ${value.length} di ${maxLength} cifre inserite`}>
+      <div
+        className="flex gap-3.5"
+        aria-label={`${value.length} di ${maxLength} cifre inserite`}
+        style={error ? { animation: "shake 0.4s cubic-bezier(.36,.07,.19,.97) both" } : undefined}
+      >
         {Array.from({ length: maxLength }).map((_, i) => (
           <div
             key={i}
-            className={`w-3.5 h-3.5 rounded-full transition-all duration-200 ${
-              i < value.length
-                ? error
-                  ? "bg-danger scale-110"
-                  : "bg-accent scale-110"
-                : "bg-border"
-            }`}
+            className="w-3 h-3 rounded-full transition-all duration-200"
+            style={{
+              backgroundColor: i < value.length
+                ? error ? "var(--color-danger)" : "var(--color-accent)"
+                : "var(--color-border)",
+              transform: i < value.length ? "scale(1.15)" : "scale(1)",
+            }}
           />
         ))}
       </div>
 
       {/* Label */}
       {label && (
-        <p className={`text-sm text-center transition-colors ${error ? "text-danger" : "text-muted"}`}>
+        <p
+          className="text-sm text-center transition-colors duration-200 min-h-[20px]"
+          style={{ color: error ? "var(--color-danger)" : "var(--color-muted)" }}
+        >
           {label}
         </p>
       )}
 
       {/* Numpad */}
-      <div className="grid grid-cols-3 gap-3 w-full max-w-[288px]">
-        {KEYS.map((key, i) => (
+      <div className="grid grid-cols-3 gap-2.5 w-full max-w-[280px] mt-1">
+        {KEYS.map((key, i) =>
           key === "" ? (
-            <div key={i} />
+            <div key={i} aria-hidden="true" />
+          ) : key === "⌫" ? (
+            <button
+              key={i}
+              type="button"
+              onClick={() => handleKey(key)}
+              className="h-14 flex items-center justify-center rounded-2xl text-muted hover:text-foreground transition-colors focus-visible:ring-2 focus-visible:ring-accent outline-none active:scale-90 text-xl"
+              aria-label="Cancella"
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 5H8L3 10l5 5h7a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z" />
+                <path d="M12 8l-4 4M8 8l4 4" />
+              </svg>
+            </button>
           ) : (
             <button
               key={i}
               type="button"
               onClick={() => handleKey(key)}
-              className={`h-14 rounded-2xl text-lg font-semibold transition-all active:scale-90 focus-visible:ring-2 focus-visible:ring-accent outline-none ${
-                key === "⌫"
-                  ? "bg-transparent text-muted hover:text-foreground text-2xl"
-                  : "bg-surface border border-border hover:bg-border"
-              }`}
-              aria-label={key === "⌫" ? "Cancella" : `Cifra ${key}`}
+              className="h-14 rounded-2xl bg-surface border border-border text-lg font-medium hover:bg-surface2 hover:border-border-hover transition-all focus-visible:ring-2 focus-visible:ring-accent outline-none active:scale-90"
+              aria-label={`Cifra ${key}`}
             >
               {key}
             </button>
           )
-        ))}
+        )}
       </div>
     </div>
   );

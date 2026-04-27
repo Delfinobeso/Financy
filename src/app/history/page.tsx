@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import Link from "next/link";
 import { useBudget } from "@/lib/context";
 import { formatCurrency, formatDate, type Expense } from "@/lib/types";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
@@ -44,14 +43,9 @@ export default function History() {
   return (
     <div className="flex flex-col flex-1 max-w-lg mx-auto w-full px-6 py-8">
       <header className="mb-8">
-        <div className="flex items-center gap-3 mb-6">
-          <Link href="/dashboard" className="w-8 h-8 flex items-center justify-center rounded-lg border border-border hover:bg-surface transition-colors focus-visible:ring-2 focus-visible:ring-accent outline-none" aria-label="Torna alla dashboard">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M9 3L5 7l4 4" /></svg>
-          </Link>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">Storico</h1>
-            <p className="text-muted text-sm">{budget.expenses.length} spese totali</p>
-          </div>
+        <div className="mb-5">
+          <h1 className="text-xl font-semibold tracking-tight">Storico</h1>
+          <p className="text-muted text-sm mt-0.5">{budget.expenses.length} spese totali</p>
         </div>
         <div className="flex gap-2">
           <label htmlFor="history-filter" className="sr-only">Filtra spese</label>
@@ -91,7 +85,7 @@ export default function History() {
                   <div className="min-w-0">
                     <p className={`text-sm truncate ${isPending ? "line-through opacity-50" : ""}`}>
                       {expense.description || cat?.name}
-                      {expense.recurring && <span className="text-warning text-xs ml-1.5" aria-label="Spesa ricorrente">↻</span>}
+                      {expense.recurring && <span className="text-recurring text-xs font-mono ml-1.5" aria-label="Spesa ricorrente">↻</span>}
                     </p>
                     <p className="text-xs text-muted mt-0.5"><span className="font-mono">{formatDate(expense.date)}</span>{cat && <><span className="mx-1.5 text-border" aria-hidden="true">·</span>{cat.name}</>}</p>
                   </div>

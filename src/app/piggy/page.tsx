@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useBudget } from "@/lib/context";
 import { formatCurrency, formatMonthLabel } from "@/lib/types";
 import { BottomNav } from "@/components/BottomNav";
@@ -23,9 +22,15 @@ export default function Piggy() {
 
   const sortedMonths = Object.entries(closedMonths).sort(([a], [b]) => b.localeCompare(a));
 
-  const last3 = sortedMonths.slice(0, 3).map(([, m]) => m.saved);
-  const avgMonthly = last3.length > 0 ? last3.reduce((s, v) => s + v, 0) / last3.length : 0;
+  const last3Saved = sortedMonths.slice(0, 3).map(([, m]) => m.saved);
+  const avgMonthly = last3Saved.length > 0
+    ? last3Saved.reduce((s, v) => s + v, 0) / last3Saved.length
+    : 0;
   const annualProjection = avgMonthly * 12;
+
+  const maxAbs = sortedMonths.length > 0
+    ? Math.max(...sortedMonths.map(([, m]) => Math.abs(m.saved)))
+    : 1;
 
   const parseMonthKey = (key: string) => {
     const [year, month] = key.split("-").map(Number);
@@ -33,91 +38,80 @@ export default function Piggy() {
   };
 
   return (
-    <div className="flex flex-col flex-1 max-w-lg mx-auto w-full px-6 py-8 pb-24">
-      <header className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <Link
-            href="/dashboard"
-            className="w-8 h-8 flex items-center justify-center rounded-lg border border-border hover:bg-surface transition-colors focus-visible:ring-2 focus-visible:ring-accent outline-none"
-            aria-label="Torna alla dashboard"
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-              <path d="M9 3L5 7l4 4" />
-            </svg>
-          </Link>
-          <h1 className="text-xl font-semibold tracking-tight">Salvadanaio</h1>
-        </div>
-      </header>
+    <div className="flex flex-col flex-1 max-w-lg mx-auto w-full px-6 pt-8 pb-24">
 
-      {/* Hero card */}
-      <div className="bg-surface border border-success/20 rounded-2xl p-6 mb-6">
-        <p className="text-muted text-xs tracking-wider mb-2">Totale accumulato</p>
-        <p className="text-4xl font-semibold tracking-tight tabular-nums text-success mb-4">
+      {/* Header */}
+      <div className="mb-8">
+        <p className="text-xs font-medium text-muted/70 uppercase tracking-widest mb-1">Salvadanaio</p>
+        <p className="text-3xl font-semibold tracking-tight tabular-nums">
           {formatCurrency(piggyTotal)}
         </p>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-background border border-border rounded-xl p-3">
-            <p className="text-muted text-xs mb-1">Media / mese</p>
-            <p className="text-base font-semibold font-mono tabular-nums">
-              {last3.length > 0 ? formatCurrency(avgMonthly) : "—"}
-            </p>
-            {last3.length > 0 && (
-              <p className="text-muted text-xs mt-0.5">ultimi {last3.length} {last3.length === 1 ? "mese" : "mesi"}</p>
-            )}
-          </div>
-          <div className="bg-background border border-border rounded-xl p-3">
-            <p className="text-muted text-xs mb-1">Proiezione annuale</p>
-            <p className="text-base font-semibold font-mono tabular-nums">
-              {last3.length > 0 ? formatCurrency(annualProjection) : "—"}
-            </p>
-            {last3.length > 0 && (
-              <p className="text-muted text-xs mt-0.5">al ritmo attuale</p>
-            )}
-          </div>
-        </div>
+        {last3Saved.length > 0 && (
+          <p className="text-sm text-muted mt-1">
+            {formatCurrency(avgMonthly)}/mese in media · {formatCurrency(annualProjection)} proiettati quest&apos;anno
+          </p>
+        )}
       </div>
 
       {/* History */}
-      <section>
-        <h2 className="text-xs tracking-wider text-muted mb-4">Storico mesi chiusi</h2>
-        {sortedMonths.length === 0 ? (
-          <div className="py-16 text-center">
-            <p className="text-4xl mb-3" aria-hidden="true">🐷</p>
-            <p className="text-muted text-sm">Nessun mese chiuso ancora</p>
-            <p className="text-muted/50 text-xs mt-1">Chiudi il mese dalla dashboard per vedere i risparmi qui</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {sortedMonths.map(([key, data]) => {
-              const { year, month } = parseMonthKey(key);
-              const isPositive = data.saved >= 0;
-              return (
-                <div key={key} className="bg-surface border border-border rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm font-medium">{formatMonthLabel(year, month)}</p>
-                    <span className={`text-sm font-semibold font-mono tabular-nums ${isPositive ? "text-success" : "text-danger"}`}>
-                      {isPositive ? "+" : ""}{formatCurrency(data.saved)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-xs text-muted font-mono tabular-nums">
-                    <span>Budget {formatCurrency(data.budget)}</span>
-                    <span>Speso {formatCurrency(data.spent)}</span>
-                  </div>
-                  <div className="mt-2 h-1 rounded-full bg-border overflow-hidden">
+      <p className="text-xs font-medium text-muted/70 uppercase tracking-widest mb-3">Mesi chiusi</p>
+
+      {sortedMonths.length === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center py-16 text-center">
+          <p className="text-muted text-sm">Nessun mese chiuso ancora</p>
+          <p className="text-muted/50 text-xs mt-1.5 max-w-[240px] leading-relaxed">
+            Torna alla dashboard a fine mese per chiuderlo e salvare l&apos;avanzo
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-px">
+          {sortedMonths.map(([key, data]) => {
+            const { year, month } = parseMonthKey(key);
+            const isPositive = data.saved >= 0;
+            const barWidth = maxAbs > 0 ? Math.abs(data.saved) / maxAbs : 0;
+            const spentPct = data.budget > 0 ? Math.min((data.spent / data.budget) * 100, 100) : 0;
+
+            return (
+              <div key={key} className="py-3">
+                <div className="flex items-baseline justify-between mb-2">
+                  <p className="text-sm font-medium">{formatMonthLabel(year, month)}</p>
+                  <span className={`text-sm font-mono tabular-nums font-semibold ${isPositive ? "text-success" : "text-danger"}`}>
+                    {isPositive ? "+" : ""}{formatCurrency(data.saved)}
+                  </span>
+                </div>
+
+                {/* Spending bar */}
+                <div className="h-1.5 rounded-full bg-border overflow-hidden mb-1.5">
+                  <div
+                    className="h-full rounded-full transition-[width] duration-500"
+                    style={{
+                      width: `${spentPct}%`,
+                      backgroundColor: isPositive ? "var(--color-success)" : "var(--color-danger)",
+                      opacity: 0.7,
+                    }}
+                  />
+                </div>
+
+                {/* Relative bar showing this month's saving vs max */}
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-0.5 rounded-full bg-border overflow-hidden">
                     <div
                       className="h-full rounded-full"
                       style={{
-                        width: `${Math.min((data.spent / data.budget) * 100, 100)}%`,
+                        width: `${barWidth * 100}%`,
                         backgroundColor: isPositive ? "var(--color-success)" : "var(--color-danger)",
                       }}
                     />
                   </div>
+                  <p className="text-xs text-muted font-mono tabular-nums shrink-0">
+                    {formatCurrency(data.spent)} / {formatCurrency(data.budget)}
+                  </p>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <BottomNav active="piggy" />
     </div>
