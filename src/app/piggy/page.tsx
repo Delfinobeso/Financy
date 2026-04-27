@@ -28,10 +28,6 @@ export default function Piggy() {
     : 0;
   const annualProjection = avgMonthly * 12;
 
-  const maxAbs = sortedMonths.length > 0
-    ? Math.max(...sortedMonths.map(([, m]) => Math.abs(m.saved)))
-    : 1;
-
   const parseMonthKey = (key: string) => {
     const [year, month] = key.split("-").map(Number);
     return { year, month: month - 1 };
@@ -47,13 +43,49 @@ export default function Piggy() {
           {formatCurrency(piggyTotal)}
         </p>
         {last3Saved.length > 0 && (
-          <p className="text-sm text-muted mt-1">
-            {formatCurrency(avgMonthly)}/mese in media · {formatCurrency(annualProjection)} proiettati quest&apos;anno
+          <p className="text-sm text-muted mt-1.5">
+            <span className="tabular-nums">{formatCurrency(avgMonthly)}</span>/mese in media
+            {" · "}
+            <span className="tabular-nums">{formatCurrency(annualProjection)}</span> proiettati quest&apos;anno
           </p>
         )}
       </div>
 
-      {/* History */}
+      {/* Sparkline trend */}
+      {sortedMonths.length >= 2 && (() => {
+        const values = [...sortedMonths].reverse().map(([, m]) => m.saved);
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        const range = max - min || 1;
+        const W = 280, H = 48, pad = 6;
+        const pts = values.map((v, i) => {
+          const x = pad + (i / (values.length - 1)) * (W - pad * 2);
+          const y = H - pad - ((v - min) / range) * (H - pad * 2);
+          return `${x},${y}`;
+        }).join(" ");
+        const lastPositive = values[values.length - 1] >= 0;
+        return (
+          <div className="mb-6">
+            <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
+              <polyline
+                points={pts}
+                fill="none"
+                stroke={lastPositive ? "var(--color-success)" : "var(--color-danger)"}
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity="0.7"
+              />
+              {values.map((v, i) => {
+                const x = pad + (i / (values.length - 1)) * (W - pad * 2);
+                const y = H - pad - ((v - min) / range) * (H - pad * 2);
+                return <circle key={i} cx={x} cy={y} r="3" fill={v >= 0 ? "var(--color-success)" : "var(--color-danger)"} />;
+              })}
+            </svg>
+          </div>
+        );
+      })()}
+
       <p className="text-xs font-medium text-muted/70 uppercase tracking-widest mb-3">Mesi chiusi</p>
 
       {sortedMonths.length === 0 ? (
@@ -64,48 +96,35 @@ export default function Piggy() {
           </p>
         </div>
       ) : (
-        <div className="space-y-px">
+        <div className="space-y-3">
           {sortedMonths.map(([key, data]) => {
             const { year, month } = parseMonthKey(key);
             const isPositive = data.saved >= 0;
-            const barWidth = maxAbs > 0 ? Math.abs(data.saved) / maxAbs : 0;
             const spentPct = data.budget > 0 ? Math.min((data.spent / data.budget) * 100, 100) : 0;
 
             return (
-              <div key={key} className="py-3">
+              <div key={key} className="rounded-xl border border-border bg-surface px-4 py-3">
                 <div className="flex items-baseline justify-between mb-2">
                   <p className="text-sm font-medium">{formatMonthLabel(year, month)}</p>
-                  <span className={`text-sm font-mono tabular-nums font-semibold ${isPositive ? "text-success" : "text-danger"}`}>
+                  <span className={`text-sm font-semibold font-mono tabular-nums ${isPositive ? "text-success" : "text-danger"}`}>
                     {isPositive ? "+" : ""}{formatCurrency(data.saved)}
                   </span>
                 </div>
 
-                {/* Spending bar */}
+                {/* Single bar: spent % of budget, colored by outcome */}
                 <div className="h-1.5 rounded-full bg-border overflow-hidden mb-1.5">
                   <div
                     className="h-full rounded-full transition-[width] duration-500"
                     style={{
                       width: `${spentPct}%`,
                       backgroundColor: isPositive ? "var(--color-success)" : "var(--color-danger)",
-                      opacity: 0.7,
                     }}
                   />
                 </div>
 
-                {/* Relative bar showing this month's saving vs max */}
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-0.5 rounded-full bg-border overflow-hidden">
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${barWidth * 100}%`,
-                        backgroundColor: isPositive ? "var(--color-success)" : "var(--color-danger)",
-                      }}
-                    />
-                  </div>
-                  <p className="text-xs text-muted font-mono tabular-nums shrink-0">
-                    {formatCurrency(data.spent)} / {formatCurrency(data.budget)}
-                  </p>
+                <div className="flex justify-between text-xs text-muted font-mono tabular-nums">
+                  <span>Speso {formatCurrency(data.spent)}</span>
+                  <span>Budget {formatCurrency(data.budget)}</span>
                 </div>
               </div>
             );

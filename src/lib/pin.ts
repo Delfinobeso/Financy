@@ -1,13 +1,22 @@
 const PIN_KEY = "financy-pin";
 
-export function getPin(): string | null {
+async function hashPin(pin: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(pin + "financy-salt");
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export function getStoredHash(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem(PIN_KEY);
 }
 
-export function setPin(pin: string): void {
+export async function setPin(pin: string): Promise<void> {
   if (typeof window === "undefined") return;
-  localStorage.setItem(PIN_KEY, pin);
+  const hash = await hashPin(pin);
+  localStorage.setItem(PIN_KEY, hash);
 }
 
 export function clearPin(): void {
@@ -16,9 +25,12 @@ export function clearPin(): void {
 }
 
 export function isPinEnabled(): boolean {
-  return getPin() !== null;
+  return getStoredHash() !== null;
 }
 
-export function verifyPin(pin: string): boolean {
-  return getPin() === pin;
+export async function verifyPin(pin: string): Promise<boolean> {
+  const stored = getStoredHash();
+  if (!stored) return false;
+  const hash = await hashPin(pin);
+  return hash === stored;
 }

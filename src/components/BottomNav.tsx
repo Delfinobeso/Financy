@@ -4,7 +4,7 @@ import Link from "next/link";
 
 type Tab = "dashboard" | "history" | "piggy" | "settings";
 
-export function BottomNav({ active }: { active: Tab }) {
+export function BottomNav({ active, budgetAlert = false }: { active: Tab; budgetAlert?: boolean }) {
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t border-border z-40"
@@ -12,7 +12,7 @@ export function BottomNav({ active }: { active: Tab }) {
       aria-label="Navigazione principale"
     >
       <div className="max-w-lg mx-auto flex">
-        <NavTab href="/dashboard" icon="grid"     label="Budget"       active={active === "dashboard"} />
+        <NavTab href="/dashboard" icon="grid"     label="Budget"       active={active === "dashboard"} alert={budgetAlert} />
         <NavTab href="/history"   icon="clock"    label="Storico"      active={active === "history"}   />
         <NavTab href="/piggy"     icon="piggy"    label="Risparmi"     active={active === "piggy"}     />
         <NavTab href="/settings"  icon="gear"     label="Impostazioni" active={active === "settings"}  />
@@ -23,7 +23,7 @@ export function BottomNav({ active }: { active: Tab }) {
 
 type IconType = "grid" | "clock" | "piggy" | "gear";
 
-function NavTab({ href, icon, label, active }: { href: string; icon: IconType; label: string; active: boolean }) {
+function NavTab({ href, icon, label, active, alert = false }: { href: string; icon: IconType; label: string; active: boolean; alert?: boolean }) {
   return (
     <Link
       href={href}
@@ -37,7 +37,12 @@ function NavTab({ href, icon, label, active }: { href: string; icon: IconType; l
       {active && (
         <span className="absolute top-0 inset-x-6 h-[2px] bg-accent rounded-full" aria-hidden="true" />
       )}
-      <Icon name={icon} />
+      <span className="relative">
+        <Icon name={icon} />
+        {alert && (
+          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-danger border border-background" aria-label="Avviso budget" />
+        )}
+      </span>
       <span className="text-[10px] font-medium leading-none">{label}</span>
     </Link>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useBudget } from "@/lib/context";
@@ -17,6 +17,7 @@ import {
 import { AddExpenseSheet } from "@/components/AddExpenseSheet";
 import { EditExpenseSheet } from "@/components/EditExpenseSheet";
 import { BottomNav } from "@/components/BottomNav";
+import { UndoToast } from "@/components/UndoToast";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 
 export default function Dashboard() {
@@ -30,10 +31,19 @@ export default function Dashboard() {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [highlightedCategory, setHighlightedCategory] = useState<string | null>(null);
+  const [newExpenseId, setNewExpenseId] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
-  const { pendingIds, requestDelete, undoDelete } = useUndoDelete(deleteExpense);
+  const { pendingIds, requestDelete, undoDelete, lastDeleted, dismissToast } = useUndoDelete(deleteExpense);
+
+  useEffect(() => { const t = setTimeout(() => setMounted(true), 60); return () => clearTimeout(t); }, []);
 
   const isCurrentMonth = viewYear === now.getFullYear() && viewMonth === now.getMonth();
+
+  const goToToday = () => {
+    setViewYear(now.getFullYear());
+    setViewMonth(now.getMonth());
+  };
   const isPastMonth =
     viewYear < now.getFullYear() ||
     (viewYear === now.getFullYear() && viewMonth < now.getMonth());
@@ -64,10 +74,14 @@ export default function Dashboard() {
 
   const handleAdd = useCallback(
     (expense: { categoryId: string; amount: number; description: string; date: string; recurring?: boolean }) => {
+      const ts = Date.now().toString(36);
       addExpense(expense);
       setShowAddSheet(false);
       setHighlightedCategory(expense.categoryId);
+      setNewExpenseId(ts);
+      try { navigator.vibrate(10); } catch {}
       setTimeout(() => setHighlightedCategory(null), 1400);
+      setTimeout(() => setNewExpenseId(null), 1600);
     },
     [addExpense]
   );
@@ -84,7 +98,22 @@ export default function Dashboard() {
 
   const recentExpenses = [...monthExpenses]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 5);
+    .slice(0, 8);
+
+  const today = now.toISOString().slice(0, 10);
+  const yesterday = new Date(now.getTime() - 86400000).toISOString().slice(0, 10);
+  const dateLabel = (d: string) => {
+    if (d === today) return "Oggi";
+    if (d === yesterday) return "Ieri";
+    return new Date(d).toLocaleDateString("it-IT", { day: "numeric", month: "long" });
+  };
+  // Group expenses by date
+  const groupedExpenses = recentExpenses.reduce<{ date: string; items: typeof recentExpenses }[]>((acc, e) => {
+    const last = acc[acc.length - 1];
+    if (last && last.date === e.date) { last.items.push(e); }
+    else acc.push({ date: e.date, items: [e] });
+    return acc;
+  }, []);
 
   const totalSpent = monthExpenses.reduce((sum, e) => sum + e.amount, 0);
   const totalRemaining = budget.monthlyIncome - totalSpent;
@@ -95,8 +124,28 @@ export default function Dashboard() {
   const isMonthClosed = !!(budget.closedMonths?.[monthKey]);
   const showCloseBanner = isCurrentMonth && !isMonthClosed && monthExpenses.length > 0;
 
+  const recurringExpenses = useMemo(
+    () => monthExpenses.filter((e) => e.recurring),
+    [monthExpenses]
+  );
+  const [selectedRecurring, setSelectedRecurring] = useState<Set<string>>(new Set());
+
+  const toggleRecurring = (id: string) =>
+    setSelectedRecurring((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
   const handleCloseMonth = () => {
     closeMonth(monthKey, totalRemaining, totalSpent, budget.monthlyIncome);
+    // Propagate selected recurring expenses to next month
+    const nextMonthDate = new Date(viewYear, viewMonth + 1, 1);
+    const nextMonthStr = nextMonthDate.toISOString().slice(0, 10);
+    monthExpenses
+      .filter((e) => e.recurring && selectedRecurring.has(e.id))
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      .forEach(({ id: _id, ...rest }) => addExpense({ ...rest, date: nextMonthStr }));
     setShowCloseModal(false);
     router.push("/piggy");
   };
@@ -123,9 +172,15 @@ export default function Dashboard() {
         </button>
 
         <div className="text-center">
-          <h1 className="text-base font-semibold tracking-tight">{formatMonthLabel(viewYear, viewMonth)}</h1>
+          <button
+            onClick={!isCurrentMonth ? goToToday : undefined}
+            className={`text-base font-semibold tracking-tight ${!isCurrentMonth ? "hover:text-accent transition-colors cursor-pointer" : ""}`}
+            aria-label={!isCurrentMonth ? "Torna al mese corrente" : undefined}
+          >
+            {formatMonthLabel(viewYear, viewMonth)}
+          </button>
           {isPastMonth && !isMonthClosed && (
-            <p className="text-xs text-muted mt-0.5">sola lettura</p>
+            <p className="text-xs text-muted mt-0.5">sola lettura · tap per tornare</p>
           )}
           {isMonthClosed && (
             <p className="text-xs text-success mt-0.5">chiuso</p>
@@ -171,6 +226,15 @@ export default function Dashboard() {
           </div>
           <p className="text-xs text-muted mt-2 tabular-nums font-mono">
             {Math.round(spentPercent)}% di {formatCurrency(budget.monthlyIncome)}
+            {isCurrentMonth && totalRemaining > 0 && (() => {
+              const daysLeft = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate() + 1;
+              const perDay = totalRemaining / Math.max(daysLeft, 1);
+              return (
+                <span className="ml-2 text-muted/60">
+                  · ~{formatCurrency(Math.floor(perDay))}/giorno
+                </span>
+              );
+            })()}
           </p>
         </div>
       </div>
@@ -201,7 +265,7 @@ export default function Dashboard() {
       <section className="px-6 mb-6">
         <p className="text-xs font-medium text-muted/70 uppercase tracking-widest mb-3">Categorie</p>
         <div className="space-y-2">
-          {budget.categories.map((category) => {
+          {budget.categories.map((category, index) => {
             const spent = spentByCategory.get(category.id) || 0;
             const budgetAmount = getCategoryBudget(budget.monthlyIncome, category.percentage);
             const remaining = getRemaining(budget.monthlyIncome, category.percentage, spent);
@@ -235,9 +299,10 @@ export default function Dashboard() {
                 </div>
                 <div className="h-1 rounded-full bg-border overflow-hidden">
                   <div
-                    className="h-full rounded-full transition-[width] duration-500"
+                    className="h-full rounded-full transition-[width] duration-700"
                     style={{
-                      width: `${pct}%`,
+                      width: mounted ? `${pct}%` : "0%",
+                      transitionDelay: mounted ? `${index * 40}ms` : "0ms",
                       backgroundColor: isOver ? "var(--color-danger)" : pct > 80 ? "var(--color-warning)" : category.color,
                     }}
                   />
@@ -263,66 +328,51 @@ export default function Dashboard() {
             )}
           </div>
         ) : (
-          <div className="space-y-px">
-            {recentExpenses.map((expense) => {
-              const cat = budget.categories.find((c) => c.id === expense.categoryId);
-              const isPending = pendingIds.has(expense.id);
-              return (
-                <button
-                  key={expense.id}
-                  onClick={() => !isPending && !isPastMonth && setEditingExpense(expense)}
-                  className={`w-full flex items-center justify-between py-3 px-2 rounded-lg transition-colors group text-left ${
-                    isPending ? "bg-danger/5 cursor-default" : isPastMonth ? "cursor-default" : "hover:bg-surface"
-                  }`}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className="w-2 h-2 rounded-full shrink-0"
-                      style={{ backgroundColor: cat?.color ?? "#888" }}
-                      aria-hidden="true"
-                    />
-                    <div className="min-w-0">
-                      <p className={`text-sm truncate ${isPending ? "line-through opacity-50" : ""}`}>
-                        {expense.description || cat?.name}
-                        {expense.recurring && (
-                          <span className="text-recurring text-xs ml-1.5 font-mono" aria-label="Spesa ricorrente">↻</span>
-                        )}
-                      </p>
-                      <p className="text-xs text-muted font-mono mt-0.5">
-                        {formatDate(expense.date)}
-                        {cat && <><span className="mx-1.5 opacity-40" aria-hidden="true">·</span>{cat.name}</>}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0 ml-3">
-                    <span className={`text-sm font-mono tabular-nums ${isPending ? "opacity-50" : ""}`}>
-                      {formatCurrency(expense.amount)}
-                    </span>
-                    {isPending ? (
+          <div>
+            {groupedExpenses.map(({ date, items }, gi) => (
+              <div key={date}>
+                <p className="text-xs text-muted/60 font-medium px-2 pt-3 pb-1.5">{dateLabel(date)}</p>
+                <div className="space-y-px">
+                  {items.map((expense, ei) => {
+                    const cat = budget.categories.find((c) => c.id === expense.categoryId);
+                    const isPending = pendingIds.has(expense.id);
+                    const isNewest = newExpenseId !== null && gi === 0 && ei === 0;
+                    return (
                       <button
-                        onClick={(e) => { e.stopPropagation(); undoDelete(expense.id); }}
-                        className="text-accent text-xs font-medium hover:underline"
+                        key={expense.id}
+                        onClick={() => !isPending && !isPastMonth && setEditingExpense(expense)}
+                        className={`w-full flex items-center justify-between py-2.5 px-2 rounded-lg transition-all group text-left ${
+                          isNewest ? "bg-success/10 animate-fade-in" : isPending ? "bg-danger/5 cursor-default" : isPastMonth ? "cursor-default" : "hover:bg-surface"
+                        }`}
                       >
-                        Annulla
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cat?.color ?? "#888" }} aria-hidden="true" />
+                          <div className="min-w-0">
+                            <p className={`text-sm truncate ${isPending ? "line-through opacity-50" : ""}`}>
+                              {expense.description || cat?.name}
+                              {expense.recurring && <span className="text-recurring text-xs ml-1.5 font-mono" aria-label="Spesa ricorrente">↻</span>}
+                            </p>
+                            <p className="text-xs text-muted mt-0.5">{cat?.name}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0 ml-3">
+                          <span className={`text-sm font-mono tabular-nums ${isPending ? "opacity-50" : ""}`}>{formatCurrency(expense.amount)}</span>
+                          {!isPending && !isPastMonth && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); requestDelete(expense.id, expense.description || cat?.name || ""); try { navigator.vibrate(10); } catch {} }}
+                              className="text-muted hover:text-danger opacity-0 group-hover:opacity-100 transition-all text-xs"
+                              aria-label={`Elimina: ${expense.description || cat?.name}`}
+                            >×</button>
+                          )}
+                        </div>
                       </button>
-                    ) : !isPastMonth ? (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); requestDelete(expense.id); }}
-                        className="text-muted hover:text-danger opacity-0 group-hover:opacity-100 transition-all text-xs"
-                        aria-label={`Elimina: ${expense.description || cat?.name}`}
-                      >
-                        ×
-                      </button>
-                    ) : null}
-                  </div>
-                </button>
-              );
-            })}
-            {monthExpenses.length > 5 && (
-              <Link
-                href="/history"
-                className="block text-center text-sm text-muted hover:text-muted-hover py-3 transition-colors"
-              >
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+            {monthExpenses.length > 8 && (
+              <Link href="/history" className="block text-center text-sm text-muted hover:text-muted-hover py-3 transition-colors">
                 Vedi tutte ({monthExpenses.length})
               </Link>
             )}
@@ -342,7 +392,14 @@ export default function Dashboard() {
         </button>
       )}
 
-      <BottomNav active="dashboard" />
+      <BottomNav
+        active="dashboard"
+        budgetAlert={isCurrentMonth && budget.categories.some((cat) => {
+          const s = spentByCategory.get(cat.id) || 0;
+          const b = (budget.monthlyIncome * cat.percentage) / 100;
+          return b > 0 && s / b >= 0.8;
+        })}
+      />
 
       {showAddSheet && (
         <AddExpenseSheet
@@ -399,6 +456,33 @@ export default function Dashboard() {
                   {formatCurrency(totalRemaining)} verranno aggiunti al tuo salvadanaio.
                 </p>
               )}
+
+              {/* Recurring expenses to propagate */}
+              {recurringExpenses.length > 0 && (
+                <div className="mb-5">
+                  <p className="text-xs font-medium text-muted/70 uppercase tracking-widest mb-2">
+                    Riproponi nel mese successivo
+                  </p>
+                  <div className="space-y-1">
+                    {recurringExpenses.map((e) => {
+                      const cat = budget.categories.find((c) => c.id === e.categoryId);
+                      return (
+                        <label key={e.id} className="flex items-center gap-3 py-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedRecurring.has(e.id)}
+                            onChange={() => toggleRecurring(e.id)}
+                            className="w-4 h-4 accent-accent"
+                          />
+                          <span className="flex-1 text-sm truncate">{e.description || cat?.name}</span>
+                          <span className="text-sm font-mono tabular-nums text-muted">{formatCurrency(e.amount)}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowCloseModal(false)}
@@ -416,6 +500,13 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+      )}
+      {lastDeleted && (
+        <UndoToast
+          label={lastDeleted.label}
+          onUndo={() => undoDelete(lastDeleted.id)}
+          onDismiss={dismissToast}
+        />
       )}
     </div>
   );

@@ -15,31 +15,33 @@ import { PinPad } from "@/components/PinPad";
 import { isPinEnabled, setPin, clearPin } from "@/lib/pin";
 import { getTheme, setTheme, type Theme } from "@/lib/theme";
 
+const CAT_COLORS = [
+  "#7c5cfc","#e4a951","#4cb782","#ffd93d","#ff6b6b",
+  "#4ecdc4","#5e6ad2","#3ec8a0","#e5484d","#6c5ce7",
+];
+
 function CategoryEditor({
-  category,
-  categories,
-  onSave,
-  onDelete,
-  canDelete,
+  category, categories, onSave, onDelete, canDelete, monthlyIncome,
 }: {
-  category: Category;
-  categories: Category[];
-  onSave: (c: Category) => void;
-  onDelete: (id: string, migrateTo: string) => void;
-  canDelete: boolean;
+  category: Category; categories: Category[]; onSave: (c: Category) => void;
+  onDelete: (id: string, migrateTo: string) => void; canDelete: boolean; monthlyIncome: number;
 }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(category.name);
-  const [percentage, setPercentage] = useState(category.percentage);
+  const [pct, setPct] = useState(category.percentage.toString());
+  const [color, setColor] = useState(category.color);
+
+  const pctNum = parseFloat(pct) || 0;
+  const monthlyAmt = (monthlyIncome * pctNum) / 100;
 
   if (!editing) {
     return (
-      <div className="flex items-center justify-between py-3 px-3 rounded-lg hover:bg-surface transition-colors group">
+      <div className="flex items-center justify-between py-3 px-3 rounded-lg hover:bg-surface2 transition-colors group">
         <div className="flex items-center gap-3">
-          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: category.color }} />
+          <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: category.color }} />
           <div>
             <p className="text-sm font-medium">{category.name}</p>
-            <p className="text-xs text-muted font-mono">{category.percentage}%</p>
+            <p className="text-xs text-muted font-mono">{category.percentage}% · {new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(monthlyAmt)}</p>
           </div>
         </div>
         <button onClick={() => setEditing(true)} className="text-muted hover:text-muted-hover opacity-0 group-hover:opacity-100 transition-all text-xs">
@@ -50,21 +52,58 @@ function CategoryEditor({
   }
 
   return (
-    <div className="py-3 px-3 rounded-lg bg-surface border border-border space-y-3">
+    <div className="py-3 px-3 rounded-xl bg-surface border border-border space-y-3">
       <div>
-        <label className="block text-muted text-xs tracking-wider mb-1">Nome</label>
-        <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-background border border-border rounded-lg h-9 px-3 text-sm outline-none focus:border-accent transition-colors" />
+        <label className="block text-xs text-muted mb-1.5">Nome</label>
+        <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-background border border-border rounded-xl h-9 px-3 text-sm outline-none focus:border-accent transition-colors" />
       </div>
       <div>
-        <label className="block text-muted text-xs tracking-wider mb-1">Percentuale</label>
-        <input type="range" min={0} max={100} value={percentage} onChange={(e) => setPercentage(parseInt(e.target.value))} className="w-full h-1.5 rounded-full appearance-none cursor-pointer" style={{ accentColor: category.color }} />
-        <span className="text-xs text-muted font-mono">{percentage}%</span>
+        <label className="block text-xs text-muted mb-1.5">
+          Percentuale
+          {monthlyIncome > 0 && pctNum > 0 && (
+            <span className="ml-1.5 text-muted/60">— {new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(monthlyAmt)}/mese</span>
+          )}
+        </label>
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step={0.1}
+            value={pct}
+            onChange={(e) => setPct(e.target.value)}
+            className="w-20 bg-background border border-border rounded-xl h-9 px-3 text-sm font-mono outline-none focus:border-accent transition-colors"
+          />
+          <span className="text-sm text-muted">%</span>
+        </div>
+      </div>
+      <div>
+        <label className="block text-xs text-muted mb-1.5">Colore</label>
+        <div className="flex gap-2 flex-wrap">
+          {CAT_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setColor(c)}
+              className="w-6 h-6 rounded-full transition-transform hover:scale-110"
+              style={{
+                backgroundColor: c,
+                outline: color === c ? `2px solid ${c}` : "none",
+                outlineOffset: "2px",
+              }}
+              aria-label={`Colore ${c}`}
+            />
+          ))}
+        </div>
       </div>
       <div className="flex gap-2">
-        <button onClick={() => { onSave({ ...category, name: name.trim() || category.name, percentage }); setEditing(false); }} className="flex-1 h-8 bg-foreground text-background text-xs font-medium rounded-lg hover:bg-muted-hover transition-colors">Salva</button>
-        <button onClick={() => setEditing(false)} className="h-8 px-3 border border-border rounded-lg text-xs hover:bg-surface transition-colors">Annulla</button>
+        <button
+          onClick={() => { onSave({ ...category, name: name.trim() || category.name, percentage: pctNum, color }); setEditing(false); }}
+          className="flex-1 h-8 bg-foreground text-background text-xs font-semibold rounded-xl hover:bg-muted-hover transition-colors"
+        >Salva</button>
+        <button onClick={() => setEditing(false)} className="h-8 px-3 border border-border rounded-xl text-xs hover:bg-surface transition-colors">Annulla</button>
         {canDelete && (
-          <button onClick={() => { const other = categories.find((c) => c.id !== category.id); if (other) onDelete(category.id, other.id); }} className="h-8 px-3 border border-danger/30 text-danger text-xs rounded-lg hover:bg-danger/10 transition-colors">Elimina</button>
+          <button onClick={() => { const other = categories.find((c) => c.id !== category.id); if (other) onDelete(category.id, other.id); }} className="h-8 px-3 border border-danger/30 text-danger text-xs rounded-xl hover:bg-danger/10 transition-colors">Elimina</button>
         )}
       </div>
     </div>
@@ -79,6 +118,8 @@ export default function Settings() {
   const [newCatName, setNewCatName] = useState("");
   const [newCatPct, setNewCatPct] = useState(10);
   const [showResetDialog, setShowResetDialog] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [pendingImport, setPendingImport] = useState<string | null>(null);
 
   // PIN state
   const [pinEnabled, setPinEnabled] = useState(() => isPinEnabled());
@@ -122,7 +163,7 @@ export default function Settings() {
     setShowPinModal(true);
   };
 
-  const handlePinInput = (v: string) => {
+  const handlePinInput = async (v: string) => {
     setPinInput(v);
     if (v.length < 4) return;
     if (pinModalMode === "create") {
@@ -132,7 +173,7 @@ export default function Settings() {
       setPinLabel("Conferma il PIN");
     } else {
       if (v === pinFirst) {
-        setPin(v);
+        await setPin(v);
         setPinEnabled(true);
         setShowPinModal(false);
       } else {
@@ -154,6 +195,23 @@ export default function Settings() {
     setPinEnabled(false);
   };
 
+  const validateBackup = (data: unknown): string | null => {
+    if (!data || typeof data !== "object") return "Il file non è un JSON valido.";
+    const d = data as Record<string, unknown>;
+    if (typeof d.monthlyIncome !== "number" || d.monthlyIncome <= 0)
+      return "Campo monthlyIncome mancante o non valido.";
+    if (!Array.isArray(d.categories) || d.categories.length === 0)
+      return "Campo categories mancante o vuoto.";
+    if (!Array.isArray(d.expenses))
+      return "Campo expenses mancante.";
+    for (const cat of d.categories as unknown[]) {
+      const c = cat as Record<string, unknown>;
+      if (typeof c.id !== "string" || typeof c.name !== "string" || typeof c.percentage !== "number")
+        return "Una o più categorie hanno una struttura non valida.";
+    }
+    return null;
+  };
+
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -161,16 +219,20 @@ export default function Settings() {
     reader.onload = () => {
       try {
         const data = JSON.parse(reader.result as string);
-        if (data.monthlyIncome && data.categories && data.expenses) {
-          if (confirm("Sostituire tutti i dati con quelli importati?")) {
-            localStorage.setItem("financy-budget", JSON.stringify(data));
-            window.location.reload();
-          }
-        } else { alert("File non valido."); }
-      } catch { alert("Errore nella lettura del file."); }
+        const err = validateBackup(data);
+        if (err) { setImportError(err); return; }
+        setPendingImport(JSON.stringify(data));
+      } catch { setImportError("Errore nella lettura del file. Assicurati che sia un backup Financy."); }
     };
     reader.readAsText(file);
     e.target.value = "";
+  };
+
+  const confirmImport = () => {
+    if (!pendingImport) return;
+    localStorage.setItem("financy-budget", pendingImport);
+    setPendingImport(null);
+    window.location.reload();
   };
 
   return (
@@ -198,7 +260,7 @@ export default function Settings() {
         </div>
         <div className="space-y-1">
           {budget.categories.map((cat) => (
-            <CategoryEditor key={cat.id} category={cat} categories={budget.categories} onSave={editCategory} onDelete={deleteCategory} canDelete={budget.categories.length > 1} />
+            <CategoryEditor key={cat.id} category={cat} categories={budget.categories} onSave={editCategory} onDelete={deleteCategory} canDelete={budget.categories.length > 1} monthlyIncome={budget.monthlyIncome} />
           ))}
         </div>
         {showNewCategory ? (
@@ -290,6 +352,33 @@ export default function Settings() {
       <p className="text-center text-muted/40 text-xs mt-12">Financy v1.0 — I tuoi dati sono salvati solo su questo dispositivo</p>
 
       <BottomNav active="settings" />
+
+      {/* Import confirm dialog */}
+      {pendingImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-[oklch(0_0_0/0.6)]" onClick={() => setPendingImport(null)} />
+          <div className="relative bg-surface border border-border rounded-2xl p-6 mx-6 max-w-sm w-full animate-scale-in" role="alertdialog">
+            <h3 className="text-base font-semibold tracking-tight mb-2">Importa backup</h3>
+            <p className="text-muted text-sm mb-5">Tutti i dati attuali verranno sostituiti con quelli del file. L&apos;operazione non è reversibile.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setPendingImport(null)} className="flex-1 h-10 border border-border rounded-xl text-sm font-medium hover:bg-surface2 transition-colors">Annulla</button>
+              <button onClick={confirmImport} className="flex-1 h-10 bg-foreground text-background text-sm font-semibold rounded-xl hover:bg-muted-hover transition-colors">Importa</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import error dialog */}
+      {importError && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-[oklch(0_0_0/0.6)]" onClick={() => setImportError(null)} />
+          <div className="relative bg-surface border border-danger/30 rounded-2xl p-6 mx-6 max-w-sm w-full animate-scale-in" role="alertdialog">
+            <h3 className="text-base font-semibold tracking-tight mb-2 text-danger">File non valido</h3>
+            <p className="text-muted text-sm mb-5">{importError}</p>
+            <button onClick={() => setImportError(null)} className="w-full h-10 border border-border rounded-xl text-sm font-medium hover:bg-surface2 transition-colors">Ok</button>
+          </div>
+        </div>
+      )}
 
       {showPinModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">

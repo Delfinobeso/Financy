@@ -4,7 +4,11 @@ export type Theme = "dark" | "light";
 
 export function getTheme(): Theme {
   if (typeof window === "undefined") return "dark";
-  return (localStorage.getItem(THEME_KEY) as Theme) ?? "dark";
+  const stored = localStorage.getItem(THEME_KEY) as Theme | null;
+  if (stored) return stored;
+  // Fall back to system preference
+  if (window.matchMedia("(prefers-color-scheme: light)").matches) return "light";
+  return "dark";
 }
 
 export function applyTheme(t: Theme): void {

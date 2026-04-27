@@ -2,26 +2,45 @@
 
 import { useState, useMemo } from "react";
 import { useBudget } from "@/lib/context";
-import { formatCurrency, formatDate, type Expense } from "@/lib/types";
+import { formatCurrency, formatDate, getMonthKey, formatMonthLabel, type Expense } from "@/lib/types";
 import { useUndoDelete } from "@/hooks/useUndoDelete";
 import { EditExpenseSheet } from "@/components/EditExpenseSheet";
 import { BottomNav } from "@/components/BottomNav";
+import { UndoToast } from "@/components/UndoToast";
 
 export default function History() {
   const { budget, editExpense, deleteExpense } = useBudget();
   const [filter, setFilter] = useState("");
+  const [monthFilter, setMonthFilter] = useState("all");
   const [sort, setSort] = useState<"date-desc" | "date-asc" | "amount-desc" | "amount-asc">("date-desc");
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
 
-  const { pendingIds, requestDelete, undoDelete } = useUndoDelete(deleteExpense);
+  const { pendingIds, requestDelete, undoDelete, lastDeleted, dismissToast } = useUndoDelete(deleteExpense);
+
+  // Build sorted list of available month keys from expenses
+  const availableMonths = useMemo(() => {
+    if (!budget) return [];
+    const keys = new Set(budget.expenses.map((e) => {
+      const d = new Date(e.date);
+      return getMonthKey(d.getFullYear(), d.getMonth());
+    }));
+    return [...keys].sort((a, b) => b.localeCompare(a));
+  }, [budget]);
 
   const filtered = useMemo(() => {
     if (!budget) return [];
     let list = [...budget.expenses];
+    if (monthFilter !== "all") {
+      list = list.filter((e) => {
+        const d = new Date(e.date);
+        return getMonthKey(d.getFullYear(), d.getMonth()) === monthFilter;
+      });
+    }
     if (filter) {
-      const cat = budget.categories.find(c => c.id === filter || c.name.toLowerCase().includes(filter.toLowerCase()));
+      const lc = filter.toLowerCase();
+      const cat = budget.categories.find(c => c.name.toLowerCase().includes(lc));
       if (cat) list = list.filter(e => e.categoryId === cat.id);
-      else list = list.filter(e => e.description.toLowerCase().includes(filter.toLowerCase()));
+      else list = list.filter(e => e.description.toLowerCase().includes(lc));
     }
     switch (sort) {
       case "date-desc": list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); break;
@@ -30,7 +49,7 @@ export default function History() {
       case "amount-asc": list.sort((a, b) => a.amount - b.amount); break;
     }
     return list;
-  }, [budget, filter, sort]);
+  }, [budget, filter, monthFilter, sort]);
 
   if (!budget) return null;
 
@@ -48,8 +67,25 @@ export default function History() {
           <p className="text-muted text-sm mt-0.5">{budget.expenses.length} spese totali</p>
         </div>
         <div className="flex gap-2">
+          {availableMonths.length > 1 && (
+            <>
+              <label htmlFor="history-month" className="sr-only">Filtra per mese</label>
+              <select
+                id="history-month"
+                value={monthFilter}
+                onChange={(e) => setMonthFilter(e.target.value)}
+                className="h-10 bg-surface border border-border rounded-lg px-2 text-sm outline-none focus:border-accent transition-colors appearance-none cursor-pointer"
+              >
+                <option value="all">Tutti</option>
+                {availableMonths.map((key) => {
+                  const [y, m] = key.split("-").map(Number);
+                  return <option key={key} value={key}>{formatMonthLabel(y, m - 1)}</option>;
+                })}
+              </select>
+            </>
+          )}
           <label htmlFor="history-filter" className="sr-only">Filtra spese</label>
-          <input id="history-filter" type="text" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filtra..." className="flex-1 h-10 bg-surface border border-border rounded-lg px-3 text-sm outline-none focus:border-accent transition-colors placeholder:text-muted/50" />
+          <input id="history-filter" type="text" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Cerca..." className="flex-1 h-10 bg-surface border border-border rounded-lg px-3 text-sm outline-none focus:border-accent transition-colors placeholder:text-muted/50" />
           <label htmlFor="history-sort" className="sr-only">Ordina spese</label>
           <select id="history-sort" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} className="h-10 bg-surface border border-border rounded-lg px-3 text-sm outline-none focus:border-accent transition-colors appearance-none cursor-pointer font-mono">
             <option value="date-desc">Più recenti</option>
@@ -92,10 +128,12 @@ export default function History() {
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <span className={`text-sm font-mono tabular-nums ${isPending ? "opacity-50" : ""}`}>{formatCurrency(expense.amount)}</span>
-                  {isPending ? (
-                    <button onClick={(e) => { e.stopPropagation(); undoDelete(expense.id); }} className="text-accent text-xs font-medium hover:underline">Annulla</button>
-                  ) : (
-                    <button onClick={(e) => { e.stopPropagation(); requestDelete(expense.id); }} className="text-muted hover:text-danger opacity-0 group-hover:opacity-100 transition-all text-xs" aria-label={`Elimina: ${expense.description || cat?.name}`}>Elimina</button>
+                  {!isPending && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); requestDelete(expense.id, expense.description || cat?.name || ""); }}
+                      className="text-muted hover:text-danger opacity-0 group-hover:opacity-100 transition-all text-xs"
+                      aria-label={`Elimina: ${expense.description || cat?.name}`}
+                    >×</button>
                   )}
                 </div>
               </button>
@@ -114,6 +152,14 @@ export default function History() {
           spentByCategory={spentByCategory}
           onSave={(e) => { editExpense(e); setEditingExpense(null); }}
           onClose={() => setEditingExpense(null)}
+        />
+      )}
+
+      {lastDeleted && (
+        <UndoToast
+          label={lastDeleted.label}
+          onUndo={() => undoDelete(lastDeleted.id)}
+          onDismiss={dismissToast}
         />
       )}
     </div>

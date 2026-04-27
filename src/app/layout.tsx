@@ -48,7 +48,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icon.svg" />
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem('financy-theme')||'dark';document.documentElement.setAttribute('data-theme',t);}catch(e){}`,
+            __html: `try{var t=localStorage.getItem('financy-theme')||(window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',t);}catch(e){}`,
           }}
         />
       </head>

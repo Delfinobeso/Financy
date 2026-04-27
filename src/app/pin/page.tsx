@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { PinPad } from "@/components/PinPad";
 import { isPinEnabled, verifyPin, setPin } from "@/lib/pin";
@@ -14,6 +14,7 @@ export default function PinPage() {
   const [firstPin, setFirstPin] = useState("");
   const [label, setLabel] = useState("");
   const [error, setError] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (isPinEnabled()) {
@@ -25,31 +26,37 @@ export default function PinPage() {
     }
   }, []);
 
-  useEffect(() => {
-    if (pin.length < 4) return;
+  const handlePinComplete = useCallback(async (completed: string) => {
+    if (busy) return;
+    setBusy(true);
 
     if (mode === "login") {
-      if (verifyPin(pin)) {
+      const ok = await verifyPin(completed);
+      if (ok) {
         router.replace("/dashboard");
       } else {
+        try { navigator.vibrate([10, 50, 10]); } catch {}
         setError(true);
         setLabel("PIN non corretto");
         setTimeout(() => {
           setCurrentPin("");
           setError(false);
           setLabel("Inserisci il PIN");
+          setBusy(false);
         }, 900);
       }
     } else if (mode === "setup-create") {
-      setFirstPin(pin);
+      setFirstPin(completed);
       setCurrentPin("");
       setMode("setup-confirm");
       setLabel("Conferma il PIN");
+      setBusy(false);
     } else if (mode === "setup-confirm") {
-      if (pin === firstPin) {
-        setPin(pin);
+      if (completed === firstPin) {
+        await setPin(completed);
         router.replace("/dashboard");
       } else {
+        try { navigator.vibrate([10, 50, 10]); } catch {}
         setError(true);
         setLabel("I PIN non coincidono");
         setTimeout(() => {
@@ -58,20 +65,24 @@ export default function PinPage() {
           setError(false);
           setMode("setup-create");
           setLabel("Crea un PIN a 4 cifre");
+          setBusy(false);
         }, 900);
       }
     }
-  }, [pin, mode, firstPin, router]);
+  }, [busy, mode, firstPin, router]);
+
+  const handleChange = (v: string) => {
+    setCurrentPin(v);
+    if (v.length === 4) handlePinComplete(v);
+  };
 
   return (
     <div className="flex flex-col flex-1 items-center justify-center px-8 py-16 max-w-sm mx-auto w-full">
-      {/* App name */}
       <div className="mb-12 text-center">
         <h1 className="text-xl font-semibold tracking-tight">Financy</h1>
         <p className="text-muted text-sm mt-1">il tuo budget personale</p>
       </div>
 
-      {/* Setup step indicators */}
       {mode !== "login" && (
         <div className="flex items-center gap-1.5 mb-10" aria-label="Passo corrente">
           <div className={`h-0.5 w-8 rounded-full transition-colors duration-200 ${mode === "setup-create" ? "bg-accent" : "bg-border"}`} />
@@ -79,12 +90,7 @@ export default function PinPage() {
         </div>
       )}
 
-      <PinPad
-        value={pin}
-        onChange={setCurrentPin}
-        label={label}
-        error={error}
-      />
+      <PinPad value={pin} onChange={handleChange} label={label} error={error} />
 
       {mode !== "login" && (
         <button

@@ -30,9 +30,18 @@ export default function Onboarding() {
   const autofill = () => {
     if (!incomeNum) return;
     const filled: Record<string, string> = {};
+    let totalRounded = 0;
     DEFAULT_CATEGORIES.forEach((c) => {
-      filled[c.name] = String(Math.round((c.percentage / 100) * incomeNum));
+      const val = Math.round((c.percentage / 100) * incomeNum);
+      filled[c.name] = String(val);
+      totalRounded += val;
     });
+    // Assign rounding residual to the last category so total == income exactly
+    const residual = incomeNum - totalRounded;
+    if (residual !== 0) {
+      const last = DEFAULT_CATEGORIES[DEFAULT_CATEGORIES.length - 1];
+      filled[last.name] = String(parseFloat(filled[last.name]) + residual);
+    }
     setAmounts(filled);
   };
 
@@ -149,8 +158,18 @@ export default function Onboarding() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto space-y-2 pb-4">
-            {DEFAULT_CATEGORIES.map((cat) => {
+          <div className="flex-1 overflow-y-auto pb-4">
+            {(
+              [
+                { label: "Necessità", keys: ["Affitto / Mutuo", "Bollette", "Spesa alimentare", "Trasporti"] },
+                { label: "Desideri", keys: ["Ristoranti / Uscite", "Svago / Hobby", "Abbigliamento", "Salute"] },
+                { label: "Risparmio e tasse", keys: ["Tasse / Acc. fiscale", "Investimenti", "Risparmi / F. emergenze"] },
+              ] as { label: string; keys: string[] }[]
+            ).map(({ label: groupLabel, keys }) => (
+              <div key={groupLabel} className="mb-4">
+                <p className="text-xs font-medium text-muted/60 uppercase tracking-widest mb-2 px-1">{groupLabel}</p>
+                <div className="space-y-2">
+                  {DEFAULT_CATEGORIES.filter((c) => keys.includes(c.name)).map((cat) => {
               const suggested = Math.round((cat.percentage / 100) * incomeNum);
               return (
                 <div key={cat.name} className="flex items-center gap-3 py-2.5 px-3 rounded-lg bg-surface">
@@ -172,7 +191,10 @@ export default function Onboarding() {
                   </div>
                 </div>
               );
-            })}
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
 
           <div className="flex gap-3 pt-4 shrink-0">

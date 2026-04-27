@@ -29,8 +29,10 @@ export function EditExpenseSheet({ expense, categories, monthlyIncome, spentByCa
   const amountNum = parseFloat(amount) || 0;
   const selectedCategory = categories.find((c) => c.id === categoryId);
   const spent = spentByCategory.get(categoryId) || 0;
+  // Only subtract the original expense amount if we're still in the same category
+  const spentAdjusted = categoryId === expense.categoryId ? spent - expense.amount : spent;
   const remaining = selectedCategory
-    ? getRemaining(monthlyIncome, selectedCategory.percentage, spent - expense.amount)
+    ? getRemaining(monthlyIncome, selectedCategory.percentage, spentAdjusted)
     : 0;
   const wouldExceed = amountNum > 0 && amountNum > remaining;
 
