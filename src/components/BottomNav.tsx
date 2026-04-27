@@ -8,6 +8,7 @@ export function BottomNav({ active }: { active: Tab }) {
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t border-border z-40"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="Navigazione principale"
     >
       <div className="max-w-lg mx-auto flex">

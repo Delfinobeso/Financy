@@ -108,7 +108,7 @@ export default function Dashboard() {
     : "var(--color-accent)";
 
   return (
-    <div className="flex flex-col flex-1 max-w-lg mx-auto w-full pb-24">
+    <div className="flex flex-col flex-1 max-w-lg mx-auto w-full" style={{ paddingBottom: "calc(6rem + env(safe-area-inset-bottom))" }}>
 
       {/* Month navigation bar */}
       <div className="flex items-center justify-between px-6 pt-8 pb-4">
@@ -334,7 +334,8 @@ export default function Dashboard() {
       {!isPastMonth && (
         <button
           onClick={() => setShowAddSheet(true)}
-          className="fixed bottom-[72px] right-1/2 translate-x-1/2 max-w-[calc(var(--spacing)*128)] w-[calc(100%-3rem)] h-11 bg-foreground text-background text-sm font-semibold rounded-xl hover:bg-muted-hover transition-colors shadow-lg focus-visible:ring-2 focus-visible:ring-accent outline-none z-30"
+          className="fixed right-1/2 translate-x-1/2 max-w-[calc(var(--spacing)*128)] w-[calc(100%-3rem)] h-11 bg-foreground text-background text-sm font-semibold rounded-xl hover:bg-muted-hover transition-colors shadow-lg focus-visible:ring-2 focus-visible:ring-accent outline-none z-30"
+          style={{ bottom: "calc(4rem + env(safe-area-inset-bottom) + 12px)" }}
           aria-label="Aggiungi una nuova spesa"
         >
           + Aggiungi spesa

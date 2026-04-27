@@ -174,7 +174,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="flex flex-col flex-1 max-w-lg mx-auto w-full px-6 py-8">
+    <div className="flex flex-col flex-1 max-w-lg mx-auto w-full px-6 pt-8" style={{ paddingBottom: "calc(6rem + env(safe-area-inset-bottom))" }}>
       <header className="mb-8">
         <h1 className="text-xl font-semibold tracking-tight">Impostazioni</h1>
       </header>
@@ -287,7 +287,7 @@ export default function Settings() {
         <button onClick={() => setShowResetDialog(true)} className="w-full h-10 border border-danger/30 text-danger rounded-lg text-sm hover:bg-danger/10 transition-colors">Resetta tutti i dati</button>
       </section>
 
-      <p className="text-center text-muted/40 text-xs mt-12 mb-24">Financy v1.0 — I tuoi dati sono salvati solo su questo dispositivo</p>
+      <p className="text-center text-muted/40 text-xs mt-12">Financy v1.0 — I tuoi dati sono salvati solo su questo dispositivo</p>
 
       <BottomNav active="settings" />
 

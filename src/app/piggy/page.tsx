@@ -38,7 +38,7 @@ export default function Piggy() {
   };
 
   return (
-    <div className="flex flex-col flex-1 max-w-lg mx-auto w-full px-6 pt-8 pb-24">
+    <div className="flex flex-col flex-1 max-w-lg mx-auto w-full px-6 pt-8" style={{ paddingBottom: "calc(6rem + env(safe-area-inset-bottom))" }}>
 
       {/* Header */}
       <div className="mb-8">

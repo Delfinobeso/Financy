@@ -41,7 +41,7 @@ export default function History() {
   }
 
   return (
-    <div className="flex flex-col flex-1 max-w-lg mx-auto w-full px-6 py-8">
+    <div className="flex flex-col flex-1 max-w-lg mx-auto w-full px-6 pt-8" style={{ paddingBottom: "calc(6rem + env(safe-area-inset-bottom))" }}>
       <header className="mb-8">
         <div className="mb-5">
           <h1 className="text-xl font-semibold tracking-tight">Storico</h1>
